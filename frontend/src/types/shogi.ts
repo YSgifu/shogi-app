@@ -17,3 +17,14 @@ export type Piece = {
 };
 
 export type Board = (Piece | null)[][];
+
+export type CapturedPieceType = Exclude<PieceType, "OU">;
+
+export type CapturedPieces = {
+    [key in CapturedPieceType]: number;
+};
+
+export type Hands = {
+    sente: CapturedPieces;
+    gote: CapturedPieces;
+};

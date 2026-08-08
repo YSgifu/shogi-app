@@ -1,0 +1,85 @@
+import type { Board, Piece } from "@/types/shogi";
+
+const sente = (type: Piece["type"]): Piece => ({
+    type,
+    player: "sente",
+    promoted: false,
+});
+
+const gote = (type: Piece["type"]): Piece => ({
+    type,
+    player: "gote",
+    promoted: false,
+});
+
+export const initialBoard: Board = [
+    [
+        gote("KY"),
+        gote("KE"),
+        gote("GI"),
+        gote("KI"),
+        gote("OU"),
+        gote("KI"),
+        gote("GI"),
+        gote("KE"),
+        gote("KY"),
+    ],
+    [
+        null,
+        gote("HI"),
+        null,
+        null,
+        null,
+        null,
+        null,
+        gote("KA"),
+        null,
+    ],
+    [
+        gote("FU"),
+        gote("FU"),
+        gote("FU"),
+        gote("FU"),
+        gote("FU"),
+        gote("FU"),
+        gote("FU"),
+        gote("FU"),
+        gote("FU"),
+    ],
+        [null, null, null, null, null, null, null, null, null],
+        [null, null, null, null, null, null, null, null, null],
+        [null, null, null, null, null, null, null, null, null],
+    [
+        sente("FU"),
+        sente("FU"),
+        sente("FU"),
+        sente("FU"),
+        sente("FU"),
+        sente("FU"),
+        sente("FU"),
+        sente("FU"),
+        sente("FU"),
+    ],
+    [
+        null,
+        sente("KA"),
+        null,
+        null,
+        null,
+        null,
+        null,
+        sente("HI"),
+        null,
+    ],
+    [
+        sente("KY"),
+        sente("KE"),
+        sente("GI"),
+        sente("KI"),
+        sente("OU"),
+        sente("KI"),
+        sente("GI"),
+        sente("KE"),
+        sente("KY"),
+    ],
+];

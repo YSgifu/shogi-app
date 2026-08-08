@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { Board, Hands } from "@/types/shogi";
-import { pieceNames } from "@/lib/piece";
-import { getMovableSquares} from "@/lib/moves";
+import { pieceNames, promotedPieceNames } from "@/lib/piece";
+import { getMovableSquares, canPromote } from "@/lib/moves";
 
 
 type BoardProps = {
@@ -24,9 +24,28 @@ export default function Board({ board }: BoardProps) {
 
     const [isPreviewing, setIsPreviewing] = useState(false);
     const [isAttackMode, setIsAttackMode] = useState(false);
+    const [canPromotePreview, setCanPromotePreview] = useState(false);
 
-    const [attackPieces, setAttackPieces] = useState<{ row: number; col: number }[]>([]);
-    const attackSquares = attackPieces.flatMap((square) => getMovableSquares(currentBoard, square.row, square.col));
+    const [attackPieces, setAttackPieces] = useState<number[]>([]);
+    const attackSquares = attackPieces.flatMap((pieceId) => {
+        const position = currentBoard
+            .flatMap((row, rowIndex) =>
+                row.map((piece, colIndex) => ({
+                    piece,
+                    row: rowIndex,
+                    col: colIndex,
+                }))
+            )
+            .find(({ piece }) => piece?.id === pieceId);
+
+        if (!position) return [];
+
+        return getMovableSquares(
+            currentBoard,
+            position.row,
+            position.col
+        );
+    });
 
     useEffect(() => {
         function handleOutsideClick(event: MouseEvent) {
@@ -61,24 +80,16 @@ export default function Board({ board }: BoardProps) {
         if (isAttackMode) {
             if (!piece) return;
 
-            const isAttackPiece = attackPieces.some(
-                (square) =>
-                    square.row === rowIndex &&
-                    square.col === colIndex
-            );
+            const isAttackPiece = attackPieces.includes(piece.id);
 
             if (isAttackPiece) {
                 setAttackPieces((prev) =>
-                    prev.filter(
-                        (square) =>
-                            square.row !== rowIndex ||
-                            square.col !== colIndex
-                    )
+                    prev.filter((id) => id !== piece.id)
                 );
             } else {
                 setAttackPieces((prev) => [
                     ...prev,
-                    { row: rowIndex, col: colIndex },
+                    piece.id,
                 ]);
             }
 
@@ -113,6 +124,16 @@ export default function Board({ board }: BoardProps) {
             const movingPiece =
                 newBoard[selectedSquare.row][selectedSquare.col];
 
+            if (!movingPiece) return;
+
+            const canPromoteMove = canPromote(
+                movingPiece,
+                selectedSquare.row,
+                rowIndex
+            );
+
+            setCanPromotePreview(canPromoteMove);
+
             const capturedPiece =
                 newBoard[rowIndex][colIndex];
 
@@ -128,6 +149,11 @@ export default function Board({ board }: BoardProps) {
                             prev[movingPiece.player][capturedType] + 1,
                     },
                 }));
+
+                // 取られた駒が効き表示中なら削除
+                setAttackPieces((prev) =>
+                    prev.filter((id) => id !== capturedPiece.id)
+                );
             }
 
             newBoard[rowIndex][colIndex] = movingPiece;
@@ -159,6 +185,8 @@ export default function Board({ board }: BoardProps) {
         );
     }
 
+    // =====================================================================================
+
     return (
         <div className="shogi-app">
             <div className="board-area">
@@ -184,27 +212,31 @@ export default function Board({ board }: BoardProps) {
                 </div>
 
                 <div className="board">
+                    {/* ===== 盤面の9×9マスを生成 ===== */}
                     {currentBoard.flatMap((row, rowIndex) =>
                         row.map((piece, colIndex) => {
+                            // ===== 選択中のマスか判定 =====
                             const isSelected =
                                 selectedSquare?.row === rowIndex &&
                                 selectedSquare?.col === colIndex;
 
+                            // ===== 移動可能なマスか判定 =====
                             const isMovable = movableSquares.some(
                                 (square) =>
                                     square.row === rowIndex &&
                                     square.col === colIndex
                             );
+
+                            // ===== 攻撃対象として選択されているマスか判定 =====
                             const isAttack = attackSquares.some(
                                 (square) =>
                                     square.row === rowIndex &&
                                     square.col === colIndex
                             );
-                            const isAttackPiece = attackPieces.some(
-                                (square) =>
-                                    square.row === rowIndex &&
-                                    square.col === colIndex
-                            );
+
+                            // ===== 効きを表示している駒か判定 =====
+                            const isAttackPiece =
+                                piece !== null && attackPieces.includes(piece.id);
 
                             return (
                                 <div
@@ -231,7 +263,9 @@ export default function Board({ board }: BoardProps) {
                                                 ${isAttackPiece ? "attack-piece" : ""}
                                                 `}
                                         >
-                                            {pieceNames[piece.type]}
+                                            {piece.promoted
+                                                ? promotedPieceNames[piece.type]
+                                                : pieceNames[piece.type]}
                                         </div>
                                     )}
                                 </div>
@@ -256,15 +290,54 @@ export default function Board({ board }: BoardProps) {
                                 }}
                             >
 
-                                <button
-                                    onClick={() => {
-                                        setIsPreviewing(false);
-                                        setSelectedSquare(null);
-                                        setMovableSquares([]);
-                                    }}
-                                >
-                                    確定
-                                </button>
+                                {canPromotePreview && (
+                                    <>
+                                        <button
+                                            onClick={() => {
+                                                if (!selectedSquare) return;
+
+                                                const newBoard = currentBoard.map((row) => [...row]);
+
+                                                const promotedPiece =
+                                                    newBoard[selectedSquare.row][selectedSquare.col];
+
+                                                if (!promotedPiece) return;
+
+                                                promotedPiece.promoted = true;
+
+                                                setCurrentBoard(newBoard);
+                                                setSelectedSquare(null);
+                                                setMovableSquares([]);
+                                                setIsPreviewing(false);
+                                                setCanPromotePreview(false);
+                                            }}
+                                        >
+                                            成る
+                                        </button>
+
+                                        <button
+                                            onClick={() => {
+                                                setIsPreviewing(false);
+                                                setSelectedSquare(null);
+                                                setMovableSquares([]);
+                                            }}
+                                        >
+                                            成らない
+                                        </button>
+                                    </>
+                                )}
+
+                                {!canPromotePreview && (
+                                    <button
+                                        onClick={() => {
+                                            setIsPreviewing(false);
+                                            setSelectedSquare(null);
+                                            setMovableSquares([]);
+                                        }}
+                                    >
+                                        確定
+                                    </button>
+                                )}
 
                                 <button
                                     onClick={() => {
@@ -275,7 +348,7 @@ export default function Board({ board }: BoardProps) {
                                         setHands(previousHands);
                                     }}
                                 >
-                                    元に戻す
+                                    キャンセル
                                 </button>
                             </div>
                         )}

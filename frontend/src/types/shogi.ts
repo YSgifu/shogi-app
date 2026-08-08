@@ -11,6 +11,7 @@ export type PieceType =
 export type Player = "sente" | "gote";
 
 export type Piece = {
+    id: number;
     type: PieceType;
     player: Player;
     promoted: boolean;

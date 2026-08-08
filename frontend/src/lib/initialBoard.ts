@@ -1,12 +1,16 @@
 import type { Board, Piece } from "@/types/shogi";
 
+let nextPieceId = 0;
+
 const sente = (type: Piece["type"]): Piece => ({
+    id: nextPieceId++,
     type,
     player: "sente",
     promoted: false,
 });
 
 const gote = (type: Piece["type"]): Piece => ({
+    id: nextPieceId++,
     type,
     player: "gote",
     promoted: false,

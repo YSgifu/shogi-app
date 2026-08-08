@@ -1,4 +1,4 @@
-import type { Board } from "@/types/shogi";
+import type { Board, Piece, Player } from "@/types/shogi";
 
 export type Square = {
     row: number;
@@ -14,6 +14,104 @@ export function getMovableSquares(
 
     if (!piece) {
         return [];
+    }
+
+    // 成り駒
+    if (piece.promoted) {
+        // と金・成香・成桂・成銀 → 金と同じ動き
+        if (
+            piece.type === "FU" ||
+            piece.type === "KY" ||
+            piece.type === "KE" ||
+            piece.type === "GI"
+        ) {
+            return getGoldMovableSquares(
+                board,
+                row,
+                col,
+                piece.player
+            );
+        }
+
+        // 馬 → 角 + 上下左右1マス
+        if (piece.type === "KA") {
+            const movableSquares = getBishopMovableSquares(
+                board,
+                row,
+                col,
+                piece.player
+            );
+
+            const candidates = [
+                { row: row - 1, col },
+                { row: row + 1, col },
+                { row, col: col - 1 },
+                { row, col: col + 1 },
+            ];
+
+            for (const candidate of candidates) {
+                if (
+                    candidate.row < 0 ||
+                    candidate.row >= 9 ||
+                    candidate.col < 0 ||
+                    candidate.col >= 9
+                ) {
+                    continue;
+                }
+
+                const targetPiece =
+                    board[candidate.row][candidate.col];
+
+                if (
+                    !targetPiece ||
+                    targetPiece.player !== piece.player
+                ) {
+                    movableSquares.push(candidate);
+                }
+            }
+
+            return movableSquares;
+        }
+
+        // 龍 → 飛車 + 斜め1マス
+        if (piece.type === "HI") {
+            const movableSquares = getRookMovableSquares(
+                board,
+                row,
+                col,
+                piece.player
+            );
+
+            const candidates = [
+                { row: row - 1, col: col - 1 },
+                { row: row - 1, col: col + 1 },
+                { row: row + 1, col: col - 1 },
+                { row: row + 1, col: col + 1 },
+            ];
+
+            for (const candidate of candidates) {
+                if (
+                    candidate.row < 0 ||
+                    candidate.row >= 9 ||
+                    candidate.col < 0 ||
+                    candidate.col >= 9
+                ) {
+                    continue;
+                }
+
+                const targetPiece =
+                    board[candidate.row][candidate.col];
+
+                if (
+                    !targetPiece ||
+                    targetPiece.player !== piece.player
+                ) {
+                    movableSquares.push(candidate);
+                }
+            }
+
+            return movableSquares;
+        }
     }
 
     // 歩
@@ -130,130 +228,32 @@ export function getMovableSquares(
 
     // 金
     if (piece.type === "KI") {
-        const direction = piece.player === "sente" ? -1 : 1;
-
-        const candidates = [
-            { row: row + direction, col: col - 1 },
-            { row: row + direction, col },
-            { row: row + direction, col: col + 1 },
-            { row, col: col - 1 },
-            { row, col: col + 1 },
-            { row: row - direction, col },
-        ];
-
-        return candidates.filter(({ row, col }) => {
-            // 盤外なら移動できない
-            if (row < 0 || row >= 9 || col < 0 || col >= 9) {
-                return false;
-            }
-
-            const targetPiece = board[row][col];
-
-            // 自分の駒があるマスには移動できない
-            if (targetPiece && targetPiece.player === piece.player) {
-                return false;
-            }
-
-            return true;
-        });
+        return getGoldMovableSquares(
+            board,
+            row,
+            col,
+            piece.player
+        );
     }
 
     // 角
     if (piece.type === "KA") {
-        const directions = [
-            { row: -1, col: -1 },
-            { row: -1, col: 1 },
-            { row: 1, col: -1 },
-            { row: 1, col: 1 },
-        ];
-
-        const movableSquares: Square[] = [];
-
-        for (const direction of directions) {
-            let nextRow = row + direction.row;
-            let nextCol = col + direction.col;
-
-            while (
-                nextRow >= 0 &&
-                nextRow < 9 &&
-                nextCol >= 0 &&
-                nextCol < 9
-            ) {
-                const targetPiece = board[nextRow][nextCol];
-
-                if (!targetPiece) {
-                    movableSquares.push({
-                        row: nextRow,
-                        col: nextCol,
-                    });
-                } else {
-                    // 相手の駒なら、そのマスまで
-                    if (targetPiece.player !== piece.player) {
-                        movableSquares.push({
-                            row: nextRow,
-                            col: nextCol,
-                        });
-                    }
-
-                    // 駒があったら、その先には進めない
-                    break;
-                }
-
-                nextRow += direction.row;
-                nextCol += direction.col;
-            }
-        }
-
-        return movableSquares;
+        return getBishopMovableSquares(
+            board,
+            row,
+            col,
+            piece.player
+        );
     }
 
     // 飛車
     if (piece.type === "HI") {
-        const directions = [
-            { row: -1, col: 0 },
-            { row: 1, col: 0 },
-            { row: 0, col: -1 },
-            { row: 0, col: 1 },
-        ];
-
-        const movableSquares: Square[] = [];
-
-        for (const direction of directions) {
-            let nextRow = row + direction.row;
-            let nextCol = col + direction.col;
-
-            while (
-                nextRow >= 0 &&
-                nextRow < 9 &&
-                nextCol >= 0 &&
-                nextCol < 9
-            ) {
-                const targetPiece = board[nextRow][nextCol];
-
-                if (!targetPiece) {
-                    movableSquares.push({
-                        row: nextRow,
-                        col: nextCol,
-                    });
-                } else {
-                    // 相手の駒なら、そのマスまで
-                    if (targetPiece.player !== piece.player) {
-                        movableSquares.push({
-                            row: nextRow,
-                            col: nextCol,
-                        });
-                    }
-
-                    // 駒があったら、その先には進めない
-                    break;
-                }
-
-                nextRow += direction.row;
-                nextCol += direction.col;
-            }
-        }
-
-        return movableSquares;
+        return getRookMovableSquares(
+            board,
+            row,
+            col,
+            piece.player
+        );
     }
 
     // 王
@@ -292,4 +292,167 @@ export function getMovableSquares(
     }
 
     return [];
+}
+
+export function canPromote(
+    piece: Piece,
+    fromRow: number,
+    toRow: number
+): boolean {
+    // 金・王は成れない
+    if (piece.type === "KI" || piece.type === "OU") {
+        return false;
+    }
+
+    // すでに成っている駒は対象外
+    if (piece.promoted) {
+        return false;
+    }
+
+    // 先手は上方向、後手は下方向が相手陣
+    const fromInPromotionZone =
+        piece.player === "sente"
+            ? fromRow <= 2
+            : fromRow >= 6;
+
+    const toInPromotionZone =
+        piece.player === "sente"
+            ? toRow <= 2
+            : toRow >= 6;
+
+    return fromInPromotionZone || toInPromotionZone;
+}
+
+function getGoldMovableSquares(
+    board: Board,
+    row: number,
+    col: number,
+    player: Player
+): Square[] {
+    const direction = player === "sente" ? -1 : 1;
+
+    const candidates = [
+        { row: row + direction, col: col - 1 },
+        { row: row + direction, col },
+        { row: row + direction, col: col + 1 },
+        { row, col: col - 1 },
+        { row, col: col + 1 },
+        { row: row - direction, col },
+    ];
+
+    return candidates.filter(({ row, col }) => {
+        if (row < 0 || row >= 9 || col < 0 || col >= 9) {
+            return false;
+        }
+
+        const targetPiece = board[row][col];
+
+        if (targetPiece && targetPiece.player === player) {
+            return false;
+        }
+
+        return true;
+    });
+}
+
+function getBishopMovableSquares(
+    board: Board,
+    row: number,
+    col: number,
+    player: Player
+): Square[] {
+    const directions = [
+        { row: -1, col: -1 },
+        { row: -1, col: 1 },
+        { row: 1, col: -1 },
+        { row: 1, col: 1 },
+    ];
+
+    const movableSquares: Square[] = [];
+
+    for (const direction of directions) {
+        let nextRow = row + direction.row;
+        let nextCol = col + direction.col;
+
+        while (
+            nextRow >= 0 &&
+            nextRow < 9 &&
+            nextCol >= 0 &&
+            nextCol < 9
+        ) {
+            const targetPiece = board[nextRow][nextCol];
+
+            if (!targetPiece) {
+                movableSquares.push({
+                    row: nextRow,
+                    col: nextCol,
+                });
+            } else {
+                if (targetPiece.player !== player) {
+                    movableSquares.push({
+                        row: nextRow,
+                        col: nextCol,
+                    });
+                }
+
+                break;
+            }
+
+            nextRow += direction.row;
+            nextCol += direction.col;
+        }
+    }
+
+    return movableSquares;
+}
+
+function getRookMovableSquares(
+    board: Board,
+    row: number,
+    col: number,
+    player: Player
+): Square[] {
+    const directions = [
+        { row: -1, col: 0 },
+        { row: 1, col: 0 },
+        { row: 0, col: -1 },
+        { row: 0, col: 1 },
+    ];
+
+    const movableSquares: Square[] = [];
+
+    for (const direction of directions) {
+        let nextRow = row + direction.row;
+        let nextCol = col + direction.col;
+
+        while (
+            nextRow >= 0 &&
+            nextRow < 9 &&
+            nextCol >= 0 &&
+            nextCol < 9
+        ) {
+            const targetPiece = board[nextRow][nextCol];
+
+            if (!targetPiece) {
+                movableSquares.push({
+                    row: nextRow,
+                    col: nextCol,
+                });
+            } else {
+                if (targetPiece.player !== player) {
+                    movableSquares.push({
+                        row: nextRow,
+                        col: nextCol,
+                    });
+                }
+
+                break;
+            }
+
+            nextRow += direction.row;
+            nextCol += direction.col;
+        }
+    }
+
+    return movableSquares;
 }

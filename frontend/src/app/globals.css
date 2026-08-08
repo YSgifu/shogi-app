@@ -3,12 +3,12 @@
   --foreground: #171717;
 }
 
-@media (prefers-color-scheme: dark) {
+/* @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
   }
-}
+} */
 
 html {
   height: 100%;
@@ -46,4 +46,16 @@ a {
   html {
     color-scheme: dark;
   }
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  width: 540px;
+  height: 540px;
+}
+
+.square {
+  border: 1px solid #333;
+  background-color: #e8c27a;
 }

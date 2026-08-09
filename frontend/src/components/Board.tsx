@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Board, Hands } from "@/types/shogi";
-import { pieceNames, promotedPieceNames } from "@/lib/piece";
-import { getMovableSquares, canPromote } from "@/lib/moves";
+import type { Board, Hands, Player, CapturedPieceType} from "@/types/shogi";
+import { pieceNames, promotedPieceNames, createPiece } from "@/lib/piece";
+import { getMovableSquares, canPromote, canDropPiece } from "@/lib/moves";
+import { isInCheck, isLegalMove, isCheckmate } from "@/lib/check";
 
 
 type BoardProps = {
@@ -11,6 +12,9 @@ type BoardProps = {
 };
 
 export default function Board({ board }: BoardProps) {
+
+    // ===== 盤面・持ち駒 =====
+
     const [currentBoard, setCurrentBoard] = useState(board);
     const [previousBoard, setPreviousBoard] = useState(board);
     const [hands, setHands] = useState<Hands>({
@@ -19,14 +23,37 @@ export default function Board({ board }: BoardProps) {
     });
     const [previousHands, setPreviousHands] = useState<Hands>(hands);
 
+    // ===== 選択状態 =====
+
     const [selectedSquare, setSelectedSquare] = useState<{row: number; col: number;} | null>(null);
     const [movableSquares, setMovableSquares] = useState< { row: number; col: number }[]>([]);
+    const [selectedHandPiece, setSelectedHandPiece] = useState<{type: CapturedPieceType; player: Player;} | null>(null);
+
+    // ===== 仮移動 =====
 
     const [isPreviewing, setIsPreviewing] = useState(false);
-    const [isAttackMode, setIsAttackMode] = useState(false);
     const [canPromotePreview, setCanPromotePreview] = useState(false);
 
+    // ===== 効き表示 =====
+
+    const [isAttackMode, setIsAttackMode] = useState(false);
     const [attackPieces, setAttackPieces] = useState<number[]>([]);
+
+    // ===== 対局状態 =====
+
+    const [currentPlayer, setCurrentPlayer] = useState<Player>("sente");
+    const [winner, setWinner] = useState<Player | null>(null);
+
+    // ===== メッセージ =====
+
+    const [message, setMessage] = useState<string | null>(null);
+    const [showWinAnimation, setShowWinAnimation] = useState(false);
+
+    const [checkmatePlayer, setCheckmatePlayer] = useState<Player | null>(null);
+    const [showCheckmateDialog, setShowCheckmateDialog] = useState(false);
+
+    // ================================================================================
+    
     const attackSquares = attackPieces.flatMap((pieceId) => {
         const position = currentBoard
             .flatMap((row, rowIndex) =>
@@ -46,16 +73,26 @@ export default function Board({ board }: BoardProps) {
             position.col
         );
     });
+    
+    
+
+    // ================================================================================
+
+    // ===== クリック処理 =====
 
     useEffect(() => {
         function handleOutsideClick(event: MouseEvent) {
             const target = event.target as HTMLElement;
 
-            if (!target.closest(".board")) {
+            if (
+                !target.closest(".board") &&
+                !target.closest(".hand")
+            ) {
                 if (isPreviewing) return;
 
                 setSelectedSquare(null);
                 setMovableSquares([]);
+                setSelectedHandPiece(null);
             }
         }
 
@@ -65,16 +102,51 @@ export default function Board({ board }: BoardProps) {
             document.removeEventListener("click", handleOutsideClick);
         };
     }, [isPreviewing]);
-    
 
-    // クリック時の操作
+    // ===== メッセージ =====
+
+    useEffect(() => {
+        if (!message) return;
+
+        const timer = setTimeout(() => {
+            setMessage(null);
+        }, 1500);
+
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [message]);
+
+    useEffect(() => {
+        if (!showWinAnimation) return;
+
+        const timer = setTimeout(() => {
+            setShowWinAnimation(false);
+        }, 2000);
+
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [showWinAnimation]);
+    
+    // ========================================================================================
+
+    // ===== 盤面クリック =====
     function handleSquareClick(rowIndex: number, colIndex: number) {
+        // ===== 対局終了 =====
+
+        if (winner) return;
+
+        // ===== クリックしたマスの情報 =====
+
         const piece = currentBoard[rowIndex][colIndex];
         const isMovable = movableSquares.some(
-        (square) =>
-            square.row === rowIndex &&
-            square.col === colIndex
+            (square) =>
+                square.row === rowIndex &&
+                square.col === colIndex
         );
+
+        // ===== 効き表示モード =====
 
 
         if (isAttackMode) {
@@ -96,30 +168,132 @@ export default function Board({ board }: BoardProps) {
             return;
         }
 
+        // ===== 持ち駒選択中 =====
 
-        // 仮移動中かつ仮移動した駒をクリック？
+        if (selectedHandPiece) {
+            // 自分の駒をクリックしたら、
+            // 持ち駒選択を解除して通常の駒選択へ移る
+            if (piece && piece.player === selectedHandPiece.player) {
+                setSelectedHandPiece(null);
+
+                setSelectedSquare({
+                    row: rowIndex,
+                    col: colIndex,
+                });
+
+                setMovableSquares(
+                    getMovableSquares(
+                        currentBoard,
+                        rowIndex,
+                        colIndex
+                    )
+                );
+
+                return;
+            }
+
+            // 持ち駒を打てる場所か確認
+            if (
+                !canDropPiece(
+                    currentBoard,
+                    selectedHandPiece.type,
+                    selectedHandPiece.player,
+                    rowIndex,
+                    colIndex
+                )
+            ) {
+                setMessage("その場所には打てません");
+                return;
+            }
+
+            // 持ち駒を打つ
+            const newBoard = currentBoard.map((row) => [...row]);
+
+
+            // newBoard[rowIndex][colIndex] = createPiece(
+            //     selectedHandPiece.type,
+            //     selectedHandPiece.player
+            // );
+
+            const newPiece = createPiece(
+                selectedHandPiece.type,
+                selectedHandPiece.player
+            );
+
+
+            console.log("打った駒:", newPiece);
+            console.log("現在のattackPieces:", attackPieces);
+
+            newBoard[rowIndex][colIndex] = newPiece;
+
+            setCurrentBoard(newBoard);
+
+            setHands((prev) => ({
+                ...prev,
+                [selectedHandPiece.player]: {
+                    ...prev[selectedHandPiece.player],
+                    [selectedHandPiece.type]:
+                        prev[selectedHandPiece.player][selectedHandPiece.type] - 1,
+                },
+            }));
+
+            setSelectedHandPiece(null);
+            switchPlayer();
+
+            return;
+        }
+
+
+        // ===== 仮移動中：仮移動した駒を再クリック =====
         if (
             isPreviewing &&
             selectedSquare?.row === rowIndex &&
             selectedSquare?.col === colIndex
         ) {
+            // 成る・成らないの選択中は確定しない
+            if (canPromotePreview) {
+                return;
+            }
+
             setIsPreviewing(false);
             setSelectedSquare(null);
             setMovableSquares([]);
 
+            switchPlayer();
+
             return;
         }
 
-        // 仮移動中？(上の仮移動中のコマは拾えるのでそれ以外)
+        // ===== 仮移動中：その他のマス =====
+
         if (isPreviewing) return;
 
 
-        // 移動可能マスクリック、仮移動
+        // ===== 移動可能マスをクリック：仮移動 =====
+
         if (isMovable && selectedSquare) {
+            const isLegal = isLegalMove(
+                currentBoard,
+                selectedSquare.row,
+                selectedSquare.col,
+                rowIndex,
+                colIndex
+            );
+
+            if (!isLegal) {
+                setMessage("その手は指せません");
+                return;
+            }
+
             setPreviousBoard(currentBoard);
             setPreviousHands(hands);
 
             const newBoard = currentBoard.map((row) => [...row]);
+
+            const newHands = {
+                sente: { ...hands.sente },
+                gote: { ...hands.gote },
+            };
 
             const movingPiece =
                 newBoard[selectedSquare.row][selectedSquare.col];
@@ -137,27 +311,34 @@ export default function Board({ board }: BoardProps) {
             const capturedPiece =
                 newBoard[rowIndex][colIndex];
 
+
             // 相手の駒を取った場合
             if (capturedPiece && movingPiece && capturedPiece.type !== "OU") {
                 const capturedType = capturedPiece.type;
 
-                setHands((prev) => ({
-                    ...prev,
-                    [movingPiece.player]: {
-                        ...prev[movingPiece.player],
-                        [capturedType]:
-                            prev[movingPiece.player][capturedType] + 1,
-                    },
-                }));
+                newHands[movingPiece.player][capturedType] += 1;
 
-                // 取られた駒が効き表示中なら削除
                 setAttackPieces((prev) =>
                     prev.filter((id) => id !== capturedPiece.id)
                 );
             }
 
+            setHands(newHands);
+
             newBoard[rowIndex][colIndex] = movingPiece;
             newBoard[selectedSquare.row][selectedSquare.col] = null;
+
+            const opponent =
+                movingPiece.player === "sente"
+                    ? "gote"
+                    : "sente";
+
+            if (isCheckmate(newBoard, opponent, newHands)) {
+                setCheckmatePlayer(movingPiece.player);
+                setShowCheckmateDialog(true);
+            } else if (isInCheck(newBoard, opponent)) {
+                setMessage("王手です");
+            }
 
             setCurrentBoard(newBoard);
 
@@ -172,8 +353,13 @@ export default function Board({ board }: BoardProps) {
             return;
         }
 
-        // クリック先に駒が無い
+        // ===== 通常の駒選択 =====
+
         if (!piece) return;
+
+        // 相手の駒は選択できない
+
+        if (piece.player !== currentPlayer) return;
 
         setSelectedSquare({
             row: rowIndex,
@@ -185,201 +371,400 @@ export default function Board({ board }: BoardProps) {
         );
     }
 
+    // ====================================================================================
+
+    // ===== 持ち駒選択 =====
+
+    function handleHandPieceClick(
+        type: CapturedPieceType,
+        player: Player
+    ) {
+        if (winner) return;
+
+        // 自分の手番ではない持ち駒は選択できない
+        if (player !== currentPlayer) return;
+
+        // 仮移動中なら元の状態に戻す
+        if (isPreviewing) {
+            setCurrentBoard(previousBoard);
+            setHands(previousHands);
+            setIsPreviewing(false);
+        }
+
+        // 盤上の駒の選択を解除
+        setSelectedSquare(null);
+        setMovableSquares([]);
+
+        // 持ち駒を選択
+        setSelectedHandPiece({
+            type,
+            player,
+        });
+    }
+
+    // ===== 手番 =====
+
+    function switchPlayer() {
+        setCurrentPlayer((prev) =>
+            prev === "sente" ? "gote" : "sente"
+        );
+    }
+
     // =====================================================================================
 
     return (
-        <div className="shogi-app">
-            <div className="board-area">
+        <div
+            className={`shogi-app ${
+                currentPlayer === "sente"
+                    ? "sente-theme"
+                    : "gote-theme"
+            }`}
+        >
 
-                <div className="hand gote-hand">
-                    <div className="hand-pieces">
-                        {Object.entries(hands.gote).map(([type, count]) =>
-                            count > 0 ? (
-                                <div key={type} className="hand-piece gote">
-                                    <div className="piece gote">
-                                        {pieceNames[type as keyof typeof pieceNames]}
-                                    </div>
+            <div className="game-area">
 
-                                    {count > 1 && (
-                                        <span className="hand-count">
-                                            {count}
-                                        </span>
-                                    )}
-                                </div>
-                            ) : null
-                        )}
-                    </div>
-                </div>
+                <div className="game-layout">
 
-                <div className="board">
-                    {/* ===== 盤面の9×9マスを生成 ===== */}
-                    {currentBoard.flatMap((row, rowIndex) =>
-                        row.map((piece, colIndex) => {
-                            // ===== 選択中のマスか判定 =====
-                            const isSelected =
-                                selectedSquare?.row === rowIndex &&
-                                selectedSquare?.col === colIndex;
+                    {/* 左列 */}
+                    <div className="left-panel">
 
-                            // ===== 移動可能なマスか判定 =====
-                            const isMovable = movableSquares.some(
-                                (square) =>
-                                    square.row === rowIndex &&
-                                    square.col === colIndex
-                            );
-
-                            // ===== 攻撃対象として選択されているマスか判定 =====
-                            const isAttack = attackSquares.some(
-                                (square) =>
-                                    square.row === rowIndex &&
-                                    square.col === colIndex
-                            );
-
-                            // ===== 効きを表示している駒か判定 =====
-                            const isAttackPiece =
-                                piece !== null && attackPieces.includes(piece.id);
-
-                            return (
-                                <div
-                                    key={`${rowIndex}-${colIndex}`}
-                                    className={`square ${
-                                        rowIndex < 3 || rowIndex >= 6
-                                            ? "promotion-zone"
-                                            : ""
-                                    }`}
-                                    onClick={() => {
-                                        handleSquareClick(rowIndex, colIndex);
-                                    }}
-                                >
-                                    <div
-                                        className={`square-overlay ${isMovable ? "movable" : ""} ${isAttack ? "attack" : ""}`}
-                                    />
-
-                                    {piece && (
+                        <div className="hand gote-hand">
+                            <div className="hand-pieces">
+                                {Object.entries(hands.gote).map(([type, count]) =>
+                                    count > 0 ? (
                                         <div
-                                            className={`
-                                                piece 
-                                                ${piece.player} 
-                                                ${isSelected ? "selected" : ""}
-                                                ${isAttackPiece ? "attack-piece" : ""}
-                                                `}
+                                            key={type}
+                                            className={`hand-piece gote ${
+                                                selectedHandPiece?.type === type &&
+                                                selectedHandPiece?.player === "gote"
+                                                    ? "selected"
+                                                    : ""
+                                            }`}
+                                            onClick={() =>
+                                                handleHandPieceClick(
+                                                    type as CapturedPieceType,
+                                                    "gote"
+                                                )
+                                            }
                                         >
-                                            {piece.promoted
-                                                ? promotedPieceNames[piece.type]
-                                                : pieceNames[piece.type]}
+                                            <div className="piece gote">
+                                                {pieceNames[type as keyof typeof pieceNames]}
+                                            </div>
+
+                                            {count > 1 && (
+                                                <span className="hand-count">
+                                                    {count}
+                                                </span>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
-                            );
-                        })
-                    )}
-
-                    {isPreviewing && selectedSquare && (
-                            <div
-                                className={`preview-message ${
-                                    selectedSquare.col >= 7
-                                        ? "preview-left"
-                                        : "preview-right"
-                                } ${
-                                    selectedSquare.row >= 7
-                                        ? "preview-above"
-                                        : ""
-                                }`}
-                                style={{
-                                    left: `${((selectedSquare.col + 0.5) / 9) * 100}%`,
-                                    top: `${((selectedSquare.row + 0.5) / 9) * 100}%`,
-                                }}
-                            >
-
-                                {canPromotePreview && (
-                                    <>
-                                        <button
-                                            onClick={() => {
-                                                if (!selectedSquare) return;
-
-                                                const newBoard = currentBoard.map((row) => [...row]);
-
-                                                const promotedPiece =
-                                                    newBoard[selectedSquare.row][selectedSquare.col];
-
-                                                if (!promotedPiece) return;
-
-                                                promotedPiece.promoted = true;
-
-                                                setCurrentBoard(newBoard);
-                                                setSelectedSquare(null);
-                                                setMovableSquares([]);
-                                                setIsPreviewing(false);
-                                                setCanPromotePreview(false);
-                                            }}
-                                        >
-                                            成る
-                                        </button>
-
-                                        <button
-                                            onClick={() => {
-                                                setIsPreviewing(false);
-                                                setSelectedSquare(null);
-                                                setMovableSquares([]);
-                                            }}
-                                        >
-                                            成らない
-                                        </button>
-                                    </>
+                                    ) : null
                                 )}
+                            </div>
+                        </div>
 
-                                {!canPromotePreview && (
-                                    <button
-                                        onClick={() => {
-                                            setIsPreviewing(false);
-                                            setSelectedSquare(null);
-                                            setMovableSquares([]);
+                        <div className="board-controls">
+
+                            <button onClick={() => setIsAttackMode(!isAttackMode)}>
+                                {isAttackMode ? "通常モード" : "効き表示モード"}
+                            </button>
+
+                            <button>
+                                全体効き表示
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                    {/* 中央列 */}
+                    <div className="board-container">
+
+                        <div className="board">
+                            {/* ダイアログ */}
+                            {message && (
+                                <div className="board-message">
+                                    {message}
+                                </div>
+                            )}
+
+
+                            {/* ===== 盤面の9×9マスを生成 ===== */}
+                            {currentBoard.flatMap((row, rowIndex) =>
+                                row.map((piece, colIndex) => {
+                                    // ===== 選択中のマスか判定 =====
+                                    const isSelected =
+                                        selectedSquare?.row === rowIndex &&
+                                        selectedSquare?.col === colIndex;
+
+                                    // ===== 移動可能なマスか判定 =====
+                                    const isMovable = movableSquares.some(
+                                        (square) =>
+                                            square.row === rowIndex &&
+                                            square.col === colIndex
+                                    );
+
+                                    // ===== 攻撃対象として選択されているマスか判定 =====
+                                    const isAttack = attackSquares.some(
+                                        (square) =>
+                                            square.row === rowIndex &&
+                                            square.col === colIndex
+                                    );
+
+                                    // ===== 効きを表示している駒か判定 =====
+                                    const isAttackPiece =
+                                        piece !== null && attackPieces.includes(piece.id);
+
+                                    return (
+                                        <div
+                                            key={`${rowIndex}-${colIndex}`}
+                                            className={`square ${
+                                                rowIndex < 3 || rowIndex >= 6
+                                                    ? "promotion-zone"
+                                                    : ""
+                                            }`}
+                                            onClick={() => {
+                                                handleSquareClick(rowIndex, colIndex);
+                                            }}
+                                        >
+                                            <div
+                                                className={`square-overlay ${isMovable ? "movable" : ""} ${isAttack ? "attack" : ""}`}
+                                            />
+
+                                            {piece && (
+                                                <div
+                                                    className={`
+                                                        piece 
+                                                        ${piece.player} 
+                                                        ${isSelected ? "selected" : ""}
+                                                        ${isAttackPiece ? "attack-piece" : ""}
+                                                        `}
+                                                >
+                                                    {piece.promoted
+                                                        ? promotedPieceNames[piece.type]
+                                                        : pieceNames[piece.type]}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            )}
+
+                            {isPreviewing && selectedSquare && !showCheckmateDialog && (
+                                    <div
+                                        className={`preview-message ${
+                                            selectedSquare.col >= 7
+                                                ? "preview-left"
+                                                : "preview-right"
+                                        } ${
+                                            selectedSquare.row >= 7
+                                                ? "preview-above"
+                                                : ""
+                                        }`}
+                                        style={{
+                                            left: `${((selectedSquare.col + 0.5) / 9) * 100}%`,
+                                            top: `${((selectedSquare.row + 0.5) / 9) * 100}%`,
                                         }}
                                     >
-                                        確定
-                                    </button>
-                                )}
 
-                                <button
-                                    onClick={() => {
-                                        setCurrentBoard(previousBoard);
-                                        setSelectedSquare(null);
-                                        setMovableSquares([]);
-                                        setIsPreviewing(false);
-                                        setHands(previousHands);
-                                    }}
-                                >
-                                    キャンセル
-                                </button>
+                                        {canPromotePreview && (
+                                            <>
+                                                <button
+                                                    onClick={() => {
+                                                        if (!selectedSquare) return;
+
+                                                        const newBoard = currentBoard.map((row) => [...row]);
+
+                                                        const promotedPiece =
+                                                            newBoard[selectedSquare.row][selectedSquare.col];
+
+                                                        if (!promotedPiece) return;
+
+                                                        promotedPiece.promoted = true;
+
+                                                        setCurrentBoard(newBoard);
+                                                        setSelectedSquare(null);
+                                                        setMovableSquares([]);
+                                                        setIsPreviewing(false);
+                                                        setCanPromotePreview(false);
+                                                        switchPlayer();
+                                                    }}
+                                                >
+                                                    成る
+                                                </button>
+
+                                                <button
+                                                    onClick={() => {
+                                                        setIsPreviewing(false);
+                                                        setSelectedSquare(null);
+                                                        setMovableSquares([]);
+                                                        switchPlayer();
+                                                    }}
+                                                >
+                                                    成らない
+                                                </button>
+                                            </>
+                                        )}
+
+                                        {!canPromotePreview && (
+                                            <button
+                                                onClick={() => {
+                                                    setIsPreviewing(false);
+                                                    setSelectedSquare(null);
+                                                    setMovableSquares([]);
+                                                    switchPlayer();
+                                                }}
+                                            >
+                                                確定
+                                            </button>
+                                        )}
+
+                                        <button
+                                            onClick={() => {
+                                                setCurrentBoard(previousBoard);
+                                                setSelectedSquare(null);
+                                                setMovableSquares([]);
+                                                setIsPreviewing(false);
+                                                setHands(previousHands);
+                                            }}
+                                        >
+                                            キャンセル
+                                        </button>
+                                    </div>
+                                )}
+                        </div>
+
+                        {showWinAnimation && winner && (
+                            <div className="win-overlay">
+                                <div className="win-message">
+                                    {winner === "sente"
+                                        ? "先手の勝ち！"
+                                        : "後手の勝ち！"}
+                                </div>
                             </div>
                         )}
-                </div>
 
-                <div className="hand sente-hand">
-                    <div className="hand-pieces">
-                        {Object.entries(hands.sente).map(([type, count]) =>
-                            count > 0 ? (
-                                <div key={type} className="hand-piece sente">
-                                    <div className="piece sente">
-                                        {pieceNames[type as keyof typeof pieceNames]}
+                        {showCheckmateDialog && (
+                            <div className="checkmate-overlay">
+                                <div className="checkmate-dialog">
+                                    <div className="checkmate-title">
+                                        詰み
                                     </div>
 
-                                    {count > 1 && (
-                                        <span className="hand-count">
-                                            {count}
-                                        </span>
-                                    )}
+                                    <div className="checkmate-subtitle">
+                                        この一手で勝負が決まります
+                                    </div>
+
+                                    <div className="checkmate-actions">
+                                        <button
+                                            onClick={() => {
+                                                if (!checkmatePlayer) return;
+
+                                                setWinner(checkmatePlayer);
+                                                setShowWinAnimation(true);
+                                                setIsPreviewing(false); // ← これを追加
+                                                setShowCheckmateDialog(false);
+                                                setCheckmatePlayer(null);
+                                            }}
+                                        >
+                                            確定
+                                        </button>
+
+                                        <button
+                                            onClick={() => {
+                                                setCurrentBoard(previousBoard);
+                                                setHands(previousHands);
+
+                                                setSelectedSquare(null);
+                                                setMovableSquares([]);
+                                                setIsPreviewing(false);
+
+                                                setShowCheckmateDialog(false);
+                                                setCheckmatePlayer(null);
+                                            }}
+                                        >
+                                            キャンセル
+                                        </button>
+                                    </div>
                                 </div>
-                            ) : null
+                            </div>
                         )}
+
                     </div>
+
+                    {/* 右列 */}
+                    <div className="right-panel">
+
+                        {winner && !showWinAnimation && (
+                            <div className="winner-message">
+                                {winner === "sente"
+                                    ? "先手の勝ち！"
+                                    : "後手の勝ち！"}
+                            </div>
+                        )}
+                        <div
+
+                            className={`current-player ${
+                                currentPlayer === "sente"
+                                    ? "sente-turn"
+                                    : "gote-turn"
+                            }`}
+                        >
+                            {currentPlayer === "sente" ? "先手の番" : "後手の番"}
+                        </div>
+
+                        <div className="hand sente-hand">
+                            <div className="hand-pieces">
+                                {Object.entries(hands.sente).map(([type, count]) =>
+                                    count > 0 ? (
+                                        <div
+                                            key={type}
+                                            className={`hand-piece sente ${
+                                                selectedHandPiece?.type === type &&
+                                                selectedHandPiece?.player === "sente"
+                                                    ? "selected"
+                                                    : ""
+                                            }`}
+                                            onClick={() =>
+                                                handleHandPieceClick(
+                                                    type as CapturedPieceType,
+                                                    "sente"
+                                                )
+                                            }
+                                        >
+                                            <div className="piece sente">
+                                                {pieceNames[type as keyof typeof pieceNames]}
+                                            </div>
+
+                                            {count > 1 && (
+                                                <span className="hand-count">
+                                                    {count}
+                                                </span>
+                                            )}
+                                        </div>
+                                    ) : null
+                                )}
+                            </div>
+                        
+                        </div>
+                    </div>
+
                 </div>
 
             </div>
 
             {/* 盤面外 */}
-            <button onClick={() => setIsAttackMode(!isAttackMode)}>
-                {isAttackMode ? "通常モード" : "効き表示モード"}
-            </button>
+
+            {process.env.NODE_ENV === "development" && (
+                <button
+                    onClick={() => {
+                        setWinner("sente");
+                        setShowWinAnimation(true);
+                    }}
+                >
+                    勝利演出をテスト
+                </button>
+            )}
+            
         </div>
     );
 }

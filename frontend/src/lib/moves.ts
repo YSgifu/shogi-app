@@ -1,4 +1,4 @@
-import type { Board, Piece, Player } from "@/types/shogi";
+import type { Board, Piece, Player, CapturedPieceType } from "@/types/shogi";
 
 export type Square = {
     row: number;
@@ -321,6 +321,54 @@ export function canPromote(
             : toRow >= 6;
 
     return fromInPromotionZone || toInPromotionZone;
+}
+
+export function canDropPiece(
+    board: Board,
+    type: CapturedPieceType,
+    player: Player,
+    row: number,
+    col: number
+): boolean {
+    // 駒があるマスには打てない
+    if (board[row][col]) {
+        return false;
+    }
+
+    const lastRow = player === "sente" ? 0 : 8;
+
+    if (
+            (type === "FU" || type === "KY") &&
+            row === lastRow
+        ) {
+            return false;
+        }
+
+        const lastTwoRows =
+        player === "sente"
+            ? row <= 1
+            : row >= 7;
+
+    if (type === "KE" && lastTwoRows) {
+        return false;
+    }
+
+    if (type === "FU") {
+        for (let r = 0; r < 9; r++) {
+            const piece = board[r][col];
+
+            if (
+                piece &&
+                piece.player === player &&
+                piece.type === "FU" &&
+                !piece.promoted
+            ) {
+                return false;
+            }
+        }
+    }
+
+    return true;
 }
 
 function getGoldMovableSquares(

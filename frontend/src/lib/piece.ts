@@ -1,4 +1,4 @@
-import type { PieceType } from "@/types/shogi";
+import type { Piece, PieceType, Player } from "@/types/shogi";
 
 export const pieceNames: Record<PieceType, string> = {
     FU: "歩",
@@ -19,3 +19,15 @@ export const promotedPieceNames: Partial<Record<PieceType, string>> = {
     KA: "馬",
     HI: "龍",
 };
+
+let nextPieceId = Date.now();
+
+export const createPiece = (
+    type: PieceType,
+    player: Player
+): Piece => ({
+    id: nextPieceId++,
+    type,
+    player,
+    promoted: false,
+});

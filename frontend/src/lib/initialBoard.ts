@@ -1,20 +1,11 @@
-import type { Board, Piece } from "@/types/shogi";
+import type { Board, PieceType } from "@/types/shogi";
+import { createPiece } from "@/lib/piece";
 
-let nextPieceId = 0;
+const sente = (type: PieceType) =>
+    createPiece(type, "sente");
 
-const sente = (type: Piece["type"]): Piece => ({
-    id: nextPieceId++,
-    type,
-    player: "sente",
-    promoted: false,
-});
-
-const gote = (type: Piece["type"]): Piece => ({
-    id: nextPieceId++,
-    type,
-    player: "gote",
-    promoted: false,
-});
+const gote = (type: PieceType) =>
+    createPiece(type, "gote");
 
 export const initialBoard: Board = [
     [

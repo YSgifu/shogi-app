@@ -51,6 +51,14 @@ export default function Board({ board }: BoardProps) {
 
     const [checkmatePlayer, setCheckmatePlayer] = useState<Player | null>(null);
     const [showCheckmateDialog, setShowCheckmateDialog] = useState(false);
+    const [lastMove, setLastMove] = useState<{
+        from: { row: number; col: number } | null;
+        to: { row: number; col: number };
+    } | null>(null);
+    const [previewMove, setPreviewMove] = useState<{
+        from: { row: number; col: number } | null;
+        to: { row: number; col: number };
+    } | null>(null);
 
     // ================================================================================
     
@@ -255,10 +263,7 @@ export default function Board({ board }: BoardProps) {
             newHands[selectedHandPiece.player][selectedHandPiece.type] -= 1;
 
             // 仮移動後の相手
-            const opponent =
-                selectedHandPiece.player === "sente"
-                    ? "gote"
-                    : "sente";
+            const opponent = getOpponent(selectedHandPiece.player);
 
             // 王手・詰み判定
             if (isCheckmate(newBoard, opponent, newHands)) {
@@ -277,6 +282,14 @@ export default function Board({ board }: BoardProps) {
             setSelectedSquare({
                 row: rowIndex,
                 col: colIndex,
+            });
+
+            setPreviewMove({
+                from: null,
+                to: {
+                    row: rowIndex,
+                    col: colIndex,
+                },
             });
 
             setMovableSquares([]);
@@ -300,12 +313,7 @@ export default function Board({ board }: BoardProps) {
                 return;
             }
 
-            setIsPreviewing(false);
-            setSelectedSquare(null);
-            setMovableSquares([]);
-
-            switchPlayer();
-
+            confirmMove(false);
             return;
         }
 
@@ -352,6 +360,13 @@ export default function Board({ board }: BoardProps) {
             );
 
             setCanPromotePreview(canPromoteMove);
+            setPreviewMove({
+                from: selectedSquare,
+                to: {
+                    row: rowIndex,
+                    col: colIndex,
+                },
+            });
 
             const capturedPiece =
                 newBoard[rowIndex][colIndex];
@@ -373,10 +388,7 @@ export default function Board({ board }: BoardProps) {
             newBoard[rowIndex][colIndex] = movingPiece;
             newBoard[selectedSquare.row][selectedSquare.col] = null;
 
-            const opponent =
-                movingPiece.player === "sente"
-                    ? "gote"
-                    : "sente";
+            const opponent = getOpponent(movingPiece.player);
 
             if (isCheckmate(newBoard, opponent, newHands)) {
                 setCheckmatePlayer(movingPiece.player);
@@ -457,6 +469,8 @@ export default function Board({ board }: BoardProps) {
         });
     }
 
+    // ====================================================================================
+
     // ===== 手番 =====
 
     function switchPlayer() {
@@ -464,6 +478,139 @@ export default function Board({ board }: BoardProps) {
             prev === "sente" ? "gote" : "sente"
         );
     }
+
+    function resetGame() {
+        const resetBoard = board.map((row) =>
+            row.map((piece) =>
+                piece ? { ...piece } : null
+            )
+        );
+
+        setCurrentBoard(resetBoard);
+        setPreviousBoard(
+            resetBoard.map((row) => [...row])
+        );
+
+        setHands({
+            sente: {FU: 0, KY: 0, KE: 0, GI: 0, KI: 0, KA: 0, HI: 0,},
+            gote: {FU: 0, KY: 0, KE: 0, GI: 0, KI: 0, KA: 0, HI: 0,},
+        });
+
+        setPreviousHands({
+            sente: {FU: 0,KY: 0,KE: 0,GI: 0,KI: 0,KA: 0,HI: 0,},
+            gote: {FU: 0,KY: 0,KE: 0,GI: 0,KI: 0,KA: 0,HI: 0,},
+        });
+
+        setSelectedSquare(null);
+        setMovableSquares([]);
+        setSelectedHandPiece(null);
+
+        setIsPreviewing(false);
+        setCanPromotePreview(false);
+
+        setIsAttackMode(false);
+        setAttackPieces([]);
+
+        setCurrentPlayer("sente");
+        setWinner(null);
+
+        setMessage(null);
+        setShowWinAnimation(false);
+
+        setCheckmatePlayer(null);
+        setShowCheckmateDialog(false);
+        setLastMove(null);
+    }
+
+    function showAllAttackPieces(player: Player) {
+        const pieceIds = currentBoard
+            .flatMap((row) => row)
+            .filter(
+                (piece): piece is NonNullable<typeof piece> =>
+                    piece !== null && piece.player === player
+            )
+            .map((piece) => piece.id);
+
+        setAttackPieces((prev) => [
+            ...new Set([...prev, ...pieceIds]),
+        ]);
+    }
+
+    function clearAttackPieces() {
+        setAttackPieces([]);
+    }
+
+    const confirmMove = (promote: boolean = false) => {
+        if (!previewMove) return;
+
+        // 成る場合だけ、仮移動後の駒を成らせる
+        if (promote && selectedSquare) {
+            const newBoard = currentBoard.map((row) =>
+                row.map((piece) =>
+                    piece ? { ...piece } : null
+                )
+            );
+
+            const promotedPiece =
+                newBoard[selectedSquare.row][selectedSquare.col];
+
+            if (promotedPiece) {
+                promotedPiece.promoted = true;
+                setCurrentBoard(newBoard);
+            }
+        }
+
+        // 直前の一手を確定
+        setLastMove(previewMove);
+
+        // 仮移動状態を解除
+        setIsPreviewing(false);
+        setSelectedSquare(null);
+        setMovableSquares([]);
+        setCanPromotePreview(false);
+
+        // 手番交代
+        switchPlayer();
+    };
+
+    function getOpponent(player: Player): Player {
+        return player === "sente" ? "gote" : "sente";
+    }
+
+    const cancelPreview = () => {
+        setCurrentBoard(previousBoard);
+        setHands(previousHands);
+
+        setSelectedSquare(null);
+        setMovableSquares([]);
+        setIsPreviewing(false);
+        setCanPromotePreview(false);
+        setPreviewMove(null);
+    };
+
+    const startPreview = (
+        newBoard: Board,
+        newHands: Hands,
+        move: {
+            from: { row: number; col: number } | null;
+            to: { row: number; col: number };
+        },
+        selectedPosition: { row: number; col: number },
+        canPromoteMove: boolean = false
+    ) => {
+        setPreviousBoard(currentBoard);
+        setPreviousHands(hands);
+
+        setCurrentBoard(newBoard);
+        setHands(newHands);
+
+        setSelectedSquare(selectedPosition);
+        setPreviewMove(move);
+        setMovableSquares([]);
+
+        setCanPromotePreview(canPromoteMove);
+        setIsPreviewing(true);
+    };
 
     // =====================================================================================
 
@@ -573,7 +720,19 @@ export default function Board({ board }: BoardProps) {
                                             }}
                                         >
                                             <div
-                                                className={`square-overlay ${isMovable || isDrop ? "movable" : ""} ${isAttack ? "attack" : ""}`}
+                                                className={`square-overlay 
+                                                    ${isMovable || isDrop ? "movable" : ""} 
+                                                    ${isAttack ? "attack" : ""}
+                                                    ${isSelected ? "selected-square-overlay" : ""}
+                                                    ${
+                                                        (lastMove?.from?.row === rowIndex &&
+                                                            lastMove?.from?.col === colIndex) ||
+                                                        (lastMove?.to?.row === rowIndex &&
+                                                            lastMove?.to?.col === colIndex)
+                                                            ? "last-move"
+                                                            : ""
+                                                    }
+                                                `}
                                             />
 
                                             {piece && (
@@ -604,7 +763,9 @@ export default function Board({ board }: BoardProps) {
                                         } ${
                                             selectedSquare.row >= 7
                                                 ? "preview-above"
-                                                : ""
+                                                : selectedSquare.row <= 1
+                                                    ? "preview-below"
+                                                    : ""
                                         }`}
                                         style={{
                                             left: `${((selectedSquare.col + 0.5) / 9) * 100}%`,
@@ -616,23 +777,7 @@ export default function Board({ board }: BoardProps) {
                                             <>
                                                 <button
                                                     onClick={() => {
-                                                        if (!selectedSquare) return;
-
-                                                        const newBoard = currentBoard.map((row) => [...row]);
-
-                                                        const promotedPiece =
-                                                            newBoard[selectedSquare.row][selectedSquare.col];
-
-                                                        if (!promotedPiece) return;
-
-                                                        promotedPiece.promoted = true;
-
-                                                        setCurrentBoard(newBoard);
-                                                        setSelectedSquare(null);
-                                                        setMovableSquares([]);
-                                                        setIsPreviewing(false);
-                                                        setCanPromotePreview(false);
-                                                        switchPlayer();
+                                                        confirmMove(true);
                                                     }}
                                                 >
                                                     成る
@@ -640,10 +785,7 @@ export default function Board({ board }: BoardProps) {
 
                                                 <button
                                                     onClick={() => {
-                                                        setIsPreviewing(false);
-                                                        setSelectedSquare(null);
-                                                        setMovableSquares([]);
-                                                        switchPlayer();
+                                                        confirmMove(false);
                                                     }}
                                                 >
                                                     成らない
@@ -654,10 +796,7 @@ export default function Board({ board }: BoardProps) {
                                         {!canPromotePreview && (
                                             <button
                                                 onClick={() => {
-                                                    setIsPreviewing(false);
-                                                    setSelectedSquare(null);
-                                                    setMovableSquares([]);
-                                                    switchPlayer();
+                                                    confirmMove();
                                                 }}
                                             >
                                                 確定
@@ -666,11 +805,7 @@ export default function Board({ board }: BoardProps) {
 
                                         <button
                                             onClick={() => {
-                                                setCurrentBoard(previousBoard);
-                                                setSelectedSquare(null);
-                                                setMovableSquares([]);
-                                                setIsPreviewing(false);
-                                                setHands(previousHands);
+                                                cancelPreview();
                                             }}
                                         >
                                             キャンセル
@@ -707,7 +842,7 @@ export default function Board({ board }: BoardProps) {
 
                                                 setWinner(checkmatePlayer);
                                                 setShowWinAnimation(true);
-                                                setIsPreviewing(false); // ← これを追加
+                                                setIsPreviewing(false);
                                                 setShowCheckmateDialog(false);
                                                 setCheckmatePlayer(null);
                                             }}
@@ -717,13 +852,7 @@ export default function Board({ board }: BoardProps) {
 
                                         <button
                                             onClick={() => {
-                                                setCurrentBoard(previousBoard);
-                                                setHands(previousHands);
-
-                                                setSelectedSquare(null);
-                                                setMovableSquares([]);
-                                                setIsPreviewing(false);
-
+                                                cancelPreview();
                                                 setShowCheckmateDialog(false);
                                                 setCheckmatePlayer(null);
                                             }}
@@ -739,11 +868,18 @@ export default function Board({ board }: BoardProps) {
 
                     {winner && !showWinAnimation && (
                         <div className="winner-message">
-                            {winner === "sente"
-                                ? "先手の勝ち！"
-                                : "後手の勝ち！"}
+                            <div>
+                                {winner === "sente"
+                                    ? "先手の勝ち！"
+                                    : "後手の勝ち！"}
+                            </div>
+
+                            <button onClick={resetGame}>
+                                もう一度対局
+                            </button>
                         </div>
                     )}
+
                     <div
 
                         className={`current-player ${
@@ -802,12 +938,14 @@ export default function Board({ board }: BoardProps) {
                             isAttackMode ? "attack" : "normal"
                         }`}
                     />
+
                     <button
                         className={!isAttackMode ? "active" : ""}
                         onClick={() => setIsAttackMode(false)}
                     >
                         通常モード
                     </button>
+
                     <button
                         className={isAttackMode ? "active" : ""}
                         onClick={() => setIsAttackMode(true)}
@@ -815,9 +953,35 @@ export default function Board({ board }: BoardProps) {
                         効き表示
                     </button>
                 </div>
-                <button>
-                    全体効き表示
-                </button>
+
+                <div className="attack-controls">
+                    <div className="attack-controls-title">
+                        一括表示
+                    </div>
+                    <div className="attack-controls-buttons">
+                        <button
+                            className="attack-all-sente"
+                            onClick={() => showAllAttackPieces("sente")}
+                        >
+                            先手
+                        </button>
+
+                        <button
+                            className="attack-all-gote"
+                            onClick={() => showAllAttackPieces("gote")}
+                        >
+                            後手
+                        </button>
+
+                        <button
+                            className="attack-clear"
+                            onClick={clearAttackPieces}
+                        >
+                            消す
+                        </button>
+                    </div>
+                </div>
+
             </div>
 
             {process.env.NODE_ENV === "development" && (

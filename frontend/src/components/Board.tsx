@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Board, Hands, Player, CapturedPieceType} from "@/types/shogi";
+import type { Board, Hands, Player, CapturedPieceType, Move, PieceType } from "@/types/shogi";
 import { pieceNames, promotedPieceNames, createPiece } from "@/lib/piece";
 import { getMovableSquares, canPromote, canDropPiece, getAttackSquares } from "@/lib/moves";
 import { isInCheck, isLegalMove, isCheckmate } from "@/lib/check";
+import { formatMove, } from "@/lib/notation";
 
 
 type BoardProps = {
@@ -22,6 +23,8 @@ export default function Board({ board }: BoardProps) {
         gote: {FU: 0, KY: 0, KE: 0, GI: 0, KI: 0, KA: 0, HI: 0,},
     });
     const [previousHands, setPreviousHands] = useState<Hands>(hands);
+    const [moveHistory, setMoveHistory] = useState<Move[]>([]);
+    const [previewCapturedPieceType, setPreviewCapturedPieceType] = useState<PieceType | null>(null);
 
     // ===== 選択状態 =====
 
@@ -236,67 +239,52 @@ export default function Board({ board }: BoardProps) {
             }
 
             // 持ち駒を打つ
-
-            // 現在の状態を保存
-            setPreviousBoard(currentBoard);
-            setPreviousHands(hands);
-
-            // 盤面をコピー
-            const newBoard = currentBoard.map((row) => [...row]);
-
-            // 持ち駒をコピー
-            const newHands = {
-                sente: { ...hands.sente },
-                gote: { ...hands.gote },
-            };
-
-            // 持ち駒から駒を生成
-            const newPiece = createPiece(
-                selectedHandPiece.type,
-                selectedHandPiece.player
-            );
-
-            // 盤上に配置
-            newBoard[rowIndex][colIndex] = newPiece;
-
-            // 持ち駒を1枚減らす
-            newHands[selectedHandPiece.player][selectedHandPiece.type] -= 1;
-
-            // 仮移動後の相手
-            const opponent = getOpponent(selectedHandPiece.player);
-
-            // 王手・詰み判定
-            if (isCheckmate(newBoard, opponent, newHands)) {
-                setCheckmatePlayer(selectedHandPiece.player);
-                setShowCheckmateDialog(true);
-            } else if (isInCheck(newBoard, opponent)) {
-                setMessage("王手です");
-            }
-
-            // 仮移動状態を反映
-            setCurrentBoard(newBoard);
-            setHands(newHands);
-
-            setSelectedHandPiece(null);
-
-            setSelectedSquare({
-                row: rowIndex,
-                col: colIndex,
-            });
-
-            setPreviewMove({
+            const move: Move = {
+                player: selectedHandPiece.player,
                 from: null,
                 to: {
                     row: rowIndex,
                     col: colIndex,
                 },
-            });
+                pieceType: selectedHandPiece.type,
+                promoted: false,
+                capturedPieceType: null,
+            };
 
-            setMovableSquares([]);
+            setPreviousBoard(currentBoard);
+            setPreviousHands(hands);
 
-            setCanPromotePreview(false);
+            const result = applyMove(
+                currentBoard,
+                hands,
+                move
+            );
 
-            setIsPreviewing(true);
+            // 仮移動後の相手
+            const opponent = getOpponent(selectedHandPiece.player);
+
+            // 王手・詰み判定
+            if (isCheckmate(result.board, opponent, result.hands)) {
+                setCheckmatePlayer(selectedHandPiece.player);
+                setShowCheckmateDialog(true);
+            } else if (isInCheck(result.board, opponent)) {
+                setMessage("王手です");
+            }
+
+            setPreviewCapturedPieceType(null);
+
+            // 仮移動状態を反映
+            startPreview(
+                result.board,
+                result.hands,
+                move,
+                {
+                    row: rowIndex,
+                    col: colIndex,
+                }
+            );
+
+            setSelectedHandPiece(null);
 
             return;
         }
@@ -338,20 +326,13 @@ export default function Board({ board }: BoardProps) {
                 return;
             }
 
-            setPreviousBoard(currentBoard);
-            setPreviousHands(hands);
-
-            const newBoard = currentBoard.map((row) => [...row]);
-
-            const newHands = {
-                sente: { ...hands.sente },
-                gote: { ...hands.gote },
-            };
-
             const movingPiece =
-                newBoard[selectedSquare.row][selectedSquare.col];
+                currentBoard[selectedSquare.row][selectedSquare.col];
 
             if (!movingPiece) return;
+
+            const capturedPiece =
+                currentBoard[rowIndex][colIndex];
 
             const canPromoteMove = canPromote(
                 movingPiece,
@@ -359,45 +340,44 @@ export default function Board({ board }: BoardProps) {
                 rowIndex
             );
 
-            setCanPromotePreview(canPromoteMove);
-            setPreviewMove({
+            const move: Move = {
+                player: movingPiece.player,
                 from: selectedSquare,
                 to: {
                     row: rowIndex,
                     col: colIndex,
                 },
-            });
+                pieceType: movingPiece.type,
+                promoted: canPromoteMove
+                    ? false
+                    : movingPiece.promoted,
+                capturedPieceType:
+                    capturedPiece?.type ?? null,
+            };
 
-            const capturedPiece =
-                newBoard[rowIndex][colIndex];
+            setPreviousBoard(currentBoard);
+            setPreviousHands(hands);
 
+            const result = applyMove(
+                currentBoard,
+                hands,
+                move
+            );
 
-            // 相手の駒を取った場合
-            if (capturedPiece && movingPiece && capturedPiece.type !== "OU") {
-                const capturedType = capturedPiece.type;
-
-                newHands[movingPiece.player][capturedType] += 1;
-
-                setAttackPieces((prev) =>
-                    prev.filter((id) => id !== capturedPiece.id)
-                );
-            }
-
-            setHands(newHands);
-
-            newBoard[rowIndex][colIndex] = movingPiece;
-            newBoard[selectedSquare.row][selectedSquare.col] = null;
+            setCanPromotePreview(canPromoteMove);
+            setPreviewMove(move);
 
             const opponent = getOpponent(movingPiece.player);
 
-            if (isCheckmate(newBoard, opponent, newHands)) {
+            if (isCheckmate(result.board, opponent, result.hands)) {
                 setCheckmatePlayer(movingPiece.player);
                 setShowCheckmateDialog(true);
-            } else if (isInCheck(newBoard, opponent)) {
+            } else if (isInCheck(result.board, opponent)) {
                 setMessage("王手です");
             }
 
-            setCurrentBoard(newBoard);
+            setCurrentBoard(result.board);
+            setHands(result.hands);
 
             setSelectedSquare({
                 row: rowIndex,
@@ -543,6 +523,16 @@ export default function Board({ board }: BoardProps) {
     const confirmMove = (promote: boolean = false) => {
         if (!previewMove) return;
 
+        const move: Move = {
+            player: currentPlayer,
+            from: previewMove.from,
+            to: previewMove.to,
+            pieceType:
+                currentBoard[previewMove.to.row][previewMove.to.col]!.type,
+            promoted: promote,
+            capturedPieceType: previewCapturedPieceType,
+        };
+
         // 成る場合だけ、仮移動後の駒を成らせる
         if (promote && selectedSquare) {
             const newBoard = currentBoard.map((row) =>
@@ -562,6 +552,8 @@ export default function Board({ board }: BoardProps) {
 
         // 直前の一手を確定
         setLastMove(previewMove);
+        
+        addMoveToHistory(move);
 
         // 仮移動状態を解除
         setIsPreviewing(false);
@@ -591,10 +583,7 @@ export default function Board({ board }: BoardProps) {
     const startPreview = (
         newBoard: Board,
         newHands: Hands,
-        move: {
-            from: { row: number; col: number } | null;
-            to: { row: number; col: number };
-        },
+        move: Move,
         selectedPosition: { row: number; col: number },
         canPromoteMove: boolean = false
     ) => {
@@ -611,6 +600,162 @@ export default function Board({ board }: BoardProps) {
         setCanPromotePreview(canPromoteMove);
         setIsPreviewing(true);
     };
+
+    const addMoveToHistory = (move: Move) => {
+        setMoveHistory((prev) => [
+            ...prev,
+            move,
+        ]);
+    };
+
+    function applyMove(
+        board: Board,
+        hands: Hands,
+        move: Move
+    ) {
+        const newBoard = board.map((row) =>
+            row.map((piece) =>
+                piece ? { ...piece } : null
+            )
+        );
+
+        const newHands = {
+            sente: { ...hands.sente },
+            gote: { ...hands.gote },
+        };
+
+        // 持ち駒を打つ
+        if (move.from === null) {
+            const newPiece = createPiece(
+                move.pieceType,
+                move.player
+            );
+
+            newPiece.promoted = move.promoted;
+
+            newBoard[move.to.row][move.to.col] = newPiece;
+
+            newHands[move.player][move.pieceType as CapturedPieceType] -= 1;
+
+            return {
+                board: newBoard,
+                hands: newHands,
+            };
+        }
+
+        // 盤上の駒を取得
+        const movingPiece =
+            newBoard[move.from.row][move.from.col];
+
+        if (!movingPiece) {
+            return {
+                board,
+                hands,
+            };
+        }
+
+        // 駒を取った場合
+        const capturedType = move.capturedPieceType;
+
+        if (capturedType && capturedType !== "OU") {
+            newHands[move.player][capturedType as CapturedPieceType] += 1;
+        }
+
+        // 成り
+        movingPiece.promoted = move.promoted;
+
+        // 駒を移動
+        newBoard[move.to.row][move.to.col] = movingPiece;
+        newBoard[move.from.row][move.from.col] = null;
+
+        return {
+            board: newBoard,
+            hands: newHands,
+        };
+    }
+
+    function rebuildPosition(history: Move[]) {
+        let rebuiltBoard = board.map((row) =>
+            row.map((piece) =>
+                piece ? { ...piece } : null
+            )
+        );
+
+        let rebuiltHands: Hands = {
+            sente: {
+                FU: 0,
+                KY: 0,
+                KE: 0,
+                GI: 0,
+                KI: 0,
+                KA: 0,
+                HI: 0,
+            },
+            gote: {
+                FU: 0,
+                KY: 0,
+                KE: 0,
+                GI: 0,
+                KI: 0,
+                KA: 0,
+                HI: 0,
+            },
+        };
+
+        for (const move of history) {
+            const result = applyMove(
+                rebuiltBoard,
+                rebuiltHands,
+                move
+            );
+
+            rebuiltBoard = result.board;
+            rebuiltHands = result.hands;
+        }
+
+        return {
+            board: rebuiltBoard,
+            hands: rebuiltHands,
+        };
+    }
+
+    function undoMove(count: number = 1) {
+        if (moveHistory.length === 0) return;
+
+        const newHistory = moveHistory.slice(
+            0,
+            Math.max(0, moveHistory.length - count)
+        );
+
+        const result = rebuildPosition(newHistory);
+
+        setMoveHistory(newHistory);
+        setCurrentBoard(result.board);
+        setHands(result.hands);
+
+        setCurrentPlayer(
+            newHistory.length % 2 === 0
+                ? "sente"
+                : "gote"
+        );
+
+        setLastMove(
+            newHistory.length > 0
+                ? {
+                    from: newHistory[newHistory.length - 1].from,
+                    to: newHistory[newHistory.length - 1].to,
+                }
+                : null
+        );
+
+        setSelectedSquare(null);
+        setMovableSquares([]);
+        setSelectedHandPiece(null);
+        setPreviewMove(null);
+        setIsPreviewing(false);
+        setCanPromotePreview(false);
+    }
+
 
     // =====================================================================================
 
@@ -982,6 +1127,22 @@ export default function Board({ board }: BoardProps) {
                     </div>
                 </div>
 
+                <button onClick={() => undoMove(1)}>
+                    一手戻す
+                </button>
+
+            </div>
+
+            <div className="move-history">
+                <h4>棋譜</h4>
+
+                <div className="move-history-list">
+                    {moveHistory.map((move, index) => (
+                        <span key={index}>
+                            {index + 1}. {formatMove(move)}
+                        </span>
+                    ))}
+                </div>
             </div>
 
             {process.env.NODE_ENV === "development" && (

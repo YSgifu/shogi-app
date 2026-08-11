@@ -29,3 +29,12 @@ export type Hands = {
     sente: CapturedPieces;
     gote: CapturedPieces;
 };
+
+export type Move = {
+    player: Player;
+    from: { row: number; col: number;} | null;
+    to: { row: number; col: number; };
+    pieceType: PieceType;
+    promoted: boolean;
+    capturedPieceType: PieceType | null;
+};

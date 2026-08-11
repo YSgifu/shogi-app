@@ -229,6 +229,11 @@ a {
     background-color: rgba(255, 193, 7, 0.45);
 }
 
+.square-overlay.last-move.movable {
+    background-color: var(--move);
+}
+
+
 /* =========================================================
     Pieces
    ========================================================= */
@@ -903,6 +908,31 @@ a {
         background-color 0.15s ease,
         transform 0.15s ease,
         box-shadow 0.15s ease;
+}
+
+.move-history {
+    width: min(90vw, 700px);
+    max-width: 100%;
+
+    padding: 10px 14px;
+
+    border: 1px solid var(--grid-line);
+    border-radius: 10px;
+
+    background: rgba(245, 243, 238, 0.72);
+
+    box-shadow:
+        0 3px 8px rgba(0, 0, 0, 0.07),
+        inset 0 1px 1px rgba(255, 255, 255, 0.8);
+
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.move-history-list {
+    display: flex;
+    gap: 16px;
+    white-space: nowrap;
 }
 
 

@@ -504,3 +504,302 @@ function getRookMovableSquares(
 
     return movableSquares;
 }
+
+function getSlidingAttackSquares(
+    board: Board,
+    row: number,
+    col: number,
+    directions: Square[]
+): Square[] {
+    const attackSquares: Square[] = [];
+
+    for (const direction of directions) {
+        let nextRow = row + direction.row;
+        let nextCol = col + direction.col;
+
+        while (
+            nextRow >= 0 &&
+            nextRow < 9 &&
+            nextCol >= 0 &&
+            nextCol < 9
+        ) {
+            attackSquares.push({
+                row: nextRow,
+                col: nextCol,
+            });
+
+            // 駒にぶつかったら、そのマスまでで終了
+            if (board[nextRow][nextCol]) {
+                break;
+            }
+
+            nextRow += direction.row;
+            nextCol += direction.col;
+        }
+    }
+
+    return attackSquares;
+}
+
+export function getAttackSquares(
+    board: Board,
+    row: number,
+    col: number
+): Square[] {
+    const piece = board[row][col];
+
+    if (!piece) {
+        return [];
+    }
+
+    if (piece.type === "HI" && !piece.promoted) {
+        return getSlidingAttackSquares(
+            board,
+            row,
+            col,
+            [
+                { row: -1, col: 0 },
+                { row: 1, col: 0 },
+                { row: 0, col: -1 },
+                { row: 0, col: 1 },
+            ]
+        );
+    }
+    
+    if (piece.type === "KA" && !piece.promoted) {
+        return getSlidingAttackSquares(
+            board,
+            row,
+            col,
+            [
+                { row: -1, col: -1 },
+                { row: -1, col: 1 },
+                { row: 1, col: -1 },
+                { row: 1, col: 1 },
+            ]
+        );
+    }
+
+    if (piece.type === "KY" && !piece.promoted) {
+        const direction = piece.player === "sente" ? -1 : 1;
+
+        return getSlidingAttackSquares(
+            board,
+            row,
+            col,
+            [
+                { row: direction, col: 0 },
+            ]
+        );
+    }
+
+    if (piece.type === "FU" && !piece.promoted) {
+        const direction = piece.player === "sente" ? -1 : 1;
+
+        const nextRow = row + direction;
+
+        if (nextRow < 0 || nextRow >= 9) {
+            return [];
+        }
+
+        return [
+            {
+                row: nextRow,
+                col,
+            },
+        ];
+    }
+
+    if (piece.type === "KE" && !piece.promoted) {
+        const direction = piece.player === "sente" ? -1 : 1;
+
+        const candidates = [
+            { row: row + direction * 2, col: col - 1 },
+            { row: row + direction * 2, col: col + 1 },
+        ];
+
+        return candidates.filter(
+            ({ row, col }) =>
+                row >= 0 &&
+                row < 9 &&
+                col >= 0 &&
+                col < 9
+        );
+    }
+
+    if (piece.type === "GI" && !piece.promoted) {
+        const direction = piece.player === "sente" ? -1 : 1;
+
+        const candidates = [
+            { row: row + direction, col: col - 1 },
+            { row: row + direction, col },
+            { row: row + direction, col: col + 1 },
+            { row: row - direction, col: col - 1 },
+            { row: row - direction, col: col + 1 },
+        ];
+
+        return candidates.filter(
+            ({ row, col }) =>
+                row >= 0 &&
+                row < 9 &&
+                col >= 0 &&
+                col < 9
+        );
+    }
+
+    if (piece.type === "KI" && !piece.promoted) {
+        const direction = piece.player === "sente" ? -1 : 1;
+
+        const candidates = [
+            { row: row + direction, col: col - 1 },
+            { row: row + direction, col },
+            { row: row + direction, col: col + 1 },
+            { row, col: col - 1 },
+            { row, col: col + 1 },
+            { row: row - direction, col },
+        ];
+
+        return candidates.filter(
+            ({ row, col }) =>
+                row >= 0 &&
+                row < 9 &&
+                col >= 0 &&
+                col < 9
+        );
+    }
+
+    if (piece.type === "OU") {
+        const directions = [
+            { row: -1, col: -1 },
+            { row: -1, col: 0 },
+            { row: -1, col: 1 },
+            { row: 0, col: -1 },
+            { row: 0, col: 1 },
+            { row: 1, col: -1 },
+            { row: 1, col: 0 },
+            { row: 1, col: 1 },
+        ];
+
+        return directions
+            .map((direction) => ({
+                row: row + direction.row,
+                col: col + direction.col,
+            }))
+            .filter(
+                ({ row, col }) =>
+                    row >= 0 &&
+                    row < 9 &&
+                    col >= 0 &&
+                    col < 9
+            );
+    }
+
+    if (piece.type === "KA" && piece.promoted) {
+        const attackSquares = getSlidingAttackSquares(
+            board,
+            row,
+            col,
+            [
+                { row: -1, col: -1 },
+                { row: -1, col: 1 },
+                { row: 1, col: -1 },
+                { row: 1, col: 1 },
+            ]
+        );
+
+        const candidates = [
+            { row: row - 1, col },
+            { row: row + 1, col },
+            { row, col: col - 1 },
+            { row, col: col + 1 },
+        ];
+
+        return [
+            ...attackSquares,
+            ...candidates.filter(
+                ({ row, col }) =>
+                    row >= 0 &&
+                    row < 9 &&
+                    col >= 0 &&
+                    col < 9
+            ),
+        ];
+    }
+
+    if (piece.type === "HI" && piece.promoted) {
+        const attackSquares = getSlidingAttackSquares(
+            board,
+            row,
+            col,
+            [
+                { row: -1, col: 0 },
+                { row: 1, col: 0 },
+                { row: 0, col: -1 },
+                { row: 0, col: 1 },
+            ]
+        );
+
+        const candidates = [
+            { row: row - 1, col: col - 1 },
+            { row: row - 1, col: col + 1 },
+            { row: row + 1, col: col - 1 },
+            { row: row + 1, col: col + 1 },
+        ];
+
+        return [
+            ...attackSquares,
+            ...candidates.filter(
+                ({ row, col }) =>
+                    row >= 0 &&
+                    row < 9 &&
+                    col >= 0 &&
+                    col < 9
+            ),
+        ];
+    }
+
+    if (
+        piece.promoted &&
+        (
+            piece.type === "FU" ||
+            piece.type === "KY" ||
+            piece.type === "KE" ||
+            piece.type === "GI"
+        )
+    ) {
+        return getGoldAttackSquares(
+            board,
+            row,
+            col,
+            piece.player
+        );
+    }
+
+    return [];
+}
+
+function getGoldAttackSquares(
+    board: Board,
+    row: number,
+    col: number,
+    player: Player
+): Square[] {
+    const direction = player === "sente" ? -1 : 1;
+
+    const candidates = [
+        { row: row + direction, col: col - 1 },
+        { row: row + direction, col },
+        { row: row + direction, col: col + 1 },
+        { row, col: col - 1 },
+        { row, col: col + 1 },
+        { row: row - direction, col },
+    ];
+
+    return candidates.filter(
+        ({ row, col }) =>
+            row >= 0 &&
+            row < 9 &&
+            col >= 0 &&
+            col < 9
+    );
+}

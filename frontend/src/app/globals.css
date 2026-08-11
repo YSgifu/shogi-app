@@ -12,12 +12,9 @@
     --attack: rgba(169, 91, 91, 0.55);
 }
 
-/* @media (prefers-color-scheme: dark) {
-    :root {
-        --background: #0a0a0a;
-        --foreground: #ededed;
-    }
-} */
+/* =========================================================
+    Base
+   ========================================================= */
 
 html {
     height: 100%;
@@ -31,11 +28,15 @@ body {
 
 body {
     min-height: 100%;
+
     display: flex;
     flex-direction: column;
+
     color: var(--foreground);
     background: var(--background);
+
     font-family: Arial, Helvetica, sans-serif;
+
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
@@ -57,18 +58,140 @@ a {
     }
 }
 
-/* ================================================================== */
+/* =========================================================
+    App Layout
+   ========================================================= */
+
+.shogi-app {
+    min-height: 100vh;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    padding: 32px 16px;
+    gap: 20px;
+
+    transition: background-color 0.5s ease;
+}
+
+.game-layout {
+    display: grid;
+    grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr);
+
+    align-items: stretch;
+    gap: 24px;
+}
+
+.game-area {
+    position: relative;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    margin-top: 20px;
+}
+
+.left-panel,
+.right-panel {
+    display: flex;
+    flex-direction: column;
+
+    height: min(90vw, 700px);
+}
+
+.left-panel {
+    align-items: flex-end;
+    justify-content: flex-start;
+
+    gap: 40px;
+}
+
+.right-panel {
+    position: relative;
+}
+
+/* =========================================================
+    Theme
+   ========================================================= */
+
+.sente-theme {
+    --theme-bg: #f0f7ff;
+    --theme-accent: #5291cd;
+    --theme-text: #1f4f7a;
+
+    background-color: var(--theme-bg);
+}
+
+.gote-theme {
+    --theme-bg: #fff5f5;
+    --theme-accent: #cd6969;
+    --theme-text: #8a3f3f;
+
+    background-color: var(--theme-bg);
+}
+
+.sente-turn {
+    background-color: #dbeafe;
+    color: #1d4ed8;
+}
+
+.gote-turn {
+    background-color: #fee2e2;
+    color: #b91c1c;
+}
+
+.current-player {
+    position: absolute;
+
+    left: 50%;
+    top: 50%;
+
+    transform: translate(-50%, -50%);
+
+    padding: 16px 24px;
+    border-radius: 12px;
+
+    font-size: 20px;
+    font-weight: bold;
+
+    white-space: nowrap;
+
+    transition:
+        background-color 0.4s ease,
+        color 0.4s ease;
+}
+
+/* =========================================================
+    Board
+   ========================================================= */
+
+.board-container {
+    position: relative;
+
+    width: min(90vw, 700px);
+    aspect-ratio: 1;
+}
+
+.board-container .board {
+    width: 100%;
+    height: 100%;
+}
 
 .board {
     display: grid;
+
     grid-template-columns: repeat(9, 1fr);
     grid-template-rows: repeat(9, 1fr);
 
     border: 1px solid var(--grid-line);
     overflow: hidden;
+
     position: relative;
 
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+
     user-select: none;
 }
 
@@ -84,72 +207,20 @@ a {
     cursor: pointer;
 }
 
-.selected {
-    transform: translateY(-4px) scale(1.04);
-    box-shadow: 0 7px 12px rgba(0, 0, 0, 0.22);
+.square.promotion-zone {
+    background-color: var(--promotion-zone);
 }
 
-.piece.gote.selected {
-    transform: rotate(180deg) translateY(-4px) scale(1.04);
-}
-
-.movable {
-    background-color: var(--move);
-}
-
-.attack {
-    background-color: var(--attack);
-}
-
-
-.piece {
-    position: relative;
-    z-index: 2;
-
-    width: 72%;
-    height: 78%;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    background-color: var(--piece);
-    color: #2f2b27;
-
-    font-family: "Times New Roman", "Yu Mincho", "Hiragino Mincho ProN", serif;
-    font-size: clamp(16px, 3vw, 30px);
-    font-weight: 700;
-
-    clip-path: polygon(
-        50% 0%,
-        100% 22%,
-        88% 100%,
-        12% 100%,
-        0% 22%
-    );
-
-    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
-
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.piece.gote {
-    transform: rotate(180deg);
-}
-
-.piece:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 9px rgba(0, 0, 0, 0.18);
-}
-
-.piece.gote:hover {
-    transform: rotate(180deg) translateY(-2px);
-}
+/* =========================================================
+    Board Overlays
+   ========================================================= */
 
 .square-overlay {
     position: absolute;
     inset: 0;
+
     z-index: 1;
+
     pointer-events: none;
 }
 
@@ -169,20 +240,291 @@ a {
     );
 }
 
-.square.promotion-zone {
-    background-color: var(--promotion-zone);
-}
+/* =========================================================
+    Pieces
+   ========================================================= */
 
-.shogi-app {
-    min-height: 100vh;
+.piece {
+    position: relative;
+    z-index: 2;
+
+    width: 72%;
+    height: 78%;
 
     display: flex;
-    flex-direction: column;
     align-items: center;
+    justify-content: center;
 
-    padding: 32px 16px;
-    gap: 20px;
+    background-color: var(--piece);
+    color: #2f2b27;
+
+    font-family:
+        "Times New Roman",
+        "Yu Mincho",
+        "Hiragino Mincho ProN",
+        serif;
+
+    font-size: clamp(16px, 3vw, 30px);
+    font-weight: 700;
+
+    clip-path: polygon(
+        50% 0%,
+        100% 22%,
+        88% 100%,
+        12% 100%,
+        0% 22%
+    );
+
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+
+    transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease;
 }
+
+.piece.gote {
+    transform: rotate(180deg);
+}
+
+.piece:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 9px rgba(0, 0, 0, 0.18);
+}
+
+.piece.gote:hover {
+    transform: rotate(180deg) translateY(-2px);
+}
+
+.selected {
+    transform: translateY(-4px) scale(1.04);
+    box-shadow: 0 7px 12px rgba(0, 0, 0, 0.22);
+}
+
+.piece.gote.selected {
+    transform: rotate(180deg) translateY(-4px) scale(1.04);
+}
+
+.attack-piece {
+    color: #c94a4a;
+}
+
+/* =========================================================
+    Hands
+   ========================================================= */
+
+.hand {
+    width: 240px;
+    height: 260px;
+
+    border: 2px solid var(--grid-line);
+    background-color: #ebe7df;
+
+    padding: 8px;
+
+    box-sizing: border-box;
+    user-select: none;
+}
+
+.hand-pieces {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+}
+
+.hand-piece {
+    position: relative;
+
+    width: 72px;
+    height: 80px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.hand-count {
+    position: absolute;
+
+    right: -6px;
+    bottom: -6px;
+
+    z-index: 10;
+
+    width: 28px;
+    height: 28px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 50%;
+
+    background: var(--foreground);
+    color: var(--background);
+
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1;
+
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18);
+}
+
+.sente-hand {
+    position: absolute;
+
+    left: 50%;
+    bottom: 0;
+
+    transform: translateX(-50%);
+}
+
+.gote-hand {
+    align-self: flex-start;
+}
+
+/* =========================================================
+    Board Controls
+   ========================================================= */
+
+.board-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* 通常ボタン */
+
+.board-controls > button {
+    padding: 10px 16px;
+
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+
+    color: #3f3f3f;
+
+    background: rgba(245, 243, 238, 0.88);
+
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    border-radius: 10px;
+
+    box-shadow:
+        0 3px 8px rgba(0, 0, 0, 0.1),
+        inset 0 1px 1px rgba(255, 255, 255, 0.8);
+
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+
+    cursor: pointer;
+
+    transition:
+        transform 0.15s ease,
+        background-color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.board-controls > button:hover {
+    background: rgba(250, 248, 244, 0.96);
+
+    box-shadow:
+        0 5px 12px rgba(0, 0, 0, 0.13),
+        inset 0 1px 1px rgba(255, 255, 255, 0.9);
+
+    transform: translateY(-1px);
+}
+
+.board-controls > button:active {
+    transform: translateY(1px);
+
+    box-shadow:
+        0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* モード切替 */
+
+.mode-switch {
+    position: relative;
+
+    display: flex;
+
+    width: 280px;
+    height: 48px;
+
+    padding: 3px;
+
+    box-sizing: border-box;
+
+    border: 1px solid var(--grid-line);
+    border-radius: 8px;
+
+    background-color: var(--background);
+}
+
+.mode-switch button {
+    position: relative;
+    z-index: 2;
+
+    flex: 1;
+
+    padding: 0;
+
+    border: none;
+    border-radius: 6px;
+
+    background: transparent;
+
+    color: var(--foreground);
+
+    font-size: 15px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    box-shadow: none;
+    transform: none;
+}
+
+.mode-switch button:hover {
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+}
+
+.mode-switch button:active {
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+}
+
+.mode-switch-slider {
+    position: absolute;
+    z-index: 1;
+
+    top: 3px;
+    left: 3px;
+
+    width: calc(50% - 3px);
+    height: calc(100% - 6px);
+
+    box-sizing: border-box;
+
+    border: 1px solid var(--grid-line);
+    border-radius: 6px;
+
+    background-color: var(--board);
+
+    pointer-events: none;
+
+    transition: transform 0.2s ease;
+}
+
+.mode-switch-slider.attack {
+    transform: translateX(100%);
+}
+
+/* =========================================================
+    Messages / Preview
+   ========================================================= */
 
 .preview-message {
     position: absolute;
@@ -223,10 +565,13 @@ a {
 
 .preview-message button {
     padding: 7px 12px;
+
     border: 1px solid #d0cbc2;
     border-radius: 6px;
+
     background: #f5f3ef;
     color: #2f2b27;
+
     cursor: pointer;
 }
 
@@ -234,86 +579,19 @@ a {
     background: #e8e4dc;
 }
 
-.attack-piece {
-    color: #c94a4a;
-}
-
-.game-layout {
-    display: grid;
-    grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr);
-    align-items: stretch;
-    gap: 24px;
-}
-
-.hand {
-    width: 240px;
-    height: 260px;
-
-    border: 2px solid var(--grid-line);
-    background-color: #ebe7df;
-
-    padding: 8px;
-
-    box-sizing: border-box;
-    user-select: none;
-}
-
-.hand-pieces {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2px;
-}
-
-.hand-piece {
-    position: relative;
-
-    width: 72px;
-    height: 80px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.hand-count {
-    position: absolute;
-    right: -6px;
-    bottom: -6px;
-
-    z-index: 10;
-
-    width: 28px;
-    height: 28px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    border-radius: 50%;
-
-    background: var(--foreground);
-    color: var(--background);
-
-    font-size: 17px;
-    font-weight: 700;
-    line-height: 1;
-
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18);
-}
-
-.gote-hand {
-    align-self: flex-start;
-}
-
 .board-message {
     position: absolute;
+
     top: 50%;
     left: 50%;
+
     transform: translate(-50%, -50%);
 
     padding: 14px 24px;
+
     background: rgba(0, 0, 0, 0.85);
     color: white;
+
     border-radius: 8px;
 
     font-size: 16px;
@@ -323,43 +601,9 @@ a {
     pointer-events: none;
 }
 
-.game-area {
-    position: relative;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-top: 20px;
-}
-
-.sente-turn {
-    background-color: #dbeafe;
-    color: #1d4ed8;
-}
-
-.gote-turn {
-    background-color: #fee2e2;
-    color: #b91c1c;
-}
-
-.shogi-app {
-    transition: background-color 0.5s ease;
-}
-
-.sente-theme {
-    --theme-bg: #f0f7ff;
-    --theme-accent: #5291cd;
-    --theme-text: #1f4f7a;
-
-    background-color: var(--theme-bg);
-}
-
-.gote-theme {
-    --theme-bg: #fff5f5;
-    --theme-accent: #cd6969;
-    --theme-text: #8a3f3f;
-
-    background-color: var(--theme-bg);
-}
+/* =========================================================
+    Winner / Checkmate
+   ========================================================= */
 
 .win-overlay {
     position: absolute;
@@ -399,31 +643,11 @@ a {
 
     backdrop-filter: blur(6px);
 
-    animation: win-pop 0.65s cubic-bezier(0.2, 1.4, 0.4, 1)
+    animation:
+        win-pop 0.65s cubic-bezier(0.2, 1.4, 0.4, 1)
         forwards;
+
     text-align: center;
-}
-
-
-@keyframes win-pop {
-    0% {
-        transform: scale(0.4);
-        opacity: 0;
-    }
-
-    55% {
-        transform: scale(1.08);
-        opacity: 1;
-    }
-
-    75% {
-        transform: scale(0.97);
-    }
-
-    100% {
-        transform: scale(1);
-        opacity: 1;
-    }
 }
 
 .win-message::before {
@@ -439,94 +663,13 @@ a {
     animation: win-glow 1s ease-out forwards;
 }
 
-@keyframes win-glow {
-    0% {
-        transform: scale(0.7);
-        opacity: 0;
-    }
-
-    40% {
-        opacity: 1;
-    }
-
-    100% {
-        transform: scale(1.15);
-        opacity: 0;
-    }
-}
-
-.board-container {
-    position: relative;
-    width: min(90vw, 700px);
-    aspect-ratio: 1;
-}
-
-.board-container .board {
-    width: 100%;
-    height: 100%;
-}
-
-.board-controls {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.left-panel,
-.right-panel {
-    display: flex;
-    flex-direction: column;
-    height: min(90vw, 700px);
-}
-
-.left-panel {
-    align-items: flex-end;
-    justify-content: flex-start;
-    gap: 40px;
-}
-
-.right-panel {
-    position: relative;
-
-    height: min(90vw, 700px);
-}
-
-.current-player {
-    position: absolute;
-
-    left: 50%;
-    top: 50%;
-
-    transform: translate(-50%, -50%);
-
-    padding: 16px 24px;
-    border-radius: 12px;
-
-    font-size: 20px;
-    font-weight: bold;
-
-    white-space: nowrap;
-
-    transition:
-        background-color 0.4s ease,
-        color 0.4s ease;
-}
-
-.sente-hand {
-    position: absolute;
-
-    left: 50%;
-    bottom: 0;
-
-    transform: translateX(-50%);
-}
-
 .winner-message {
     padding: 10px 22px;
 
     font-size: 20px;
     font-weight: 800;
     letter-spacing: 0.06em;
+
     white-space: nowrap;
 
     color: var(--theme-text);
@@ -547,58 +690,10 @@ a {
 
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
+
     text-align: center;
 }
 
-/* =============================================================================== */
-
-.board-controls button {
-    padding: 10px 16px;
-
-    font-size: 14px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-
-    color: #3f3f3f;
-
-    background: rgba(245, 243, 238, 0.88);
-
-    border: 1px solid rgba(255, 255, 255, 0.9);
-    border-radius: 10px;
-
-    box-shadow:
-        0 3px 8px rgba(0, 0, 0, 0.1),
-        inset 0 1px 1px rgba(255, 255, 255, 0.8);
-
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-
-    cursor: pointer;
-
-    transition:
-        transform 0.15s ease,
-        background-color 0.15s ease,
-        box-shadow 0.15s ease;
-}
-
-.board-controls button:hover {
-    background: rgba(250, 248, 244, 0.96);
-
-    box-shadow:
-        0 5px 12px rgba(0, 0, 0, 0.13),
-        inset 0 1px 1px rgba(255, 255, 255, 0.9);
-
-    transform: translateY(-1px);
-}
-
-.board-controls button:active {
-    transform: translateY(1px);
-
-    box-shadow:
-        0 2px 5px rgba(0, 0, 0, 0.1);
-}
-
-/* ================================================================== */
 .checkmate-overlay {
     position: absolute;
     inset: 0;
@@ -695,6 +790,47 @@ a {
 
 .checkmate-actions button:active {
     transform: translateY(1px);
+}
+
+/* =========================================================
+    Animations
+   ========================================================= */
+
+@keyframes win-pop {
+    0% {
+        transform: scale(0.4);
+        opacity: 0;
+    }
+
+    55% {
+        transform: scale(1.08);
+        opacity: 1;
+    }
+
+    75% {
+        transform: scale(0.97);
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes win-glow {
+    0% {
+        transform: scale(0.7);
+        opacity: 0;
+    }
+
+    40% {
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(1.15);
+        opacity: 0;
+    }
 }
 
 @keyframes checkmate-pop {

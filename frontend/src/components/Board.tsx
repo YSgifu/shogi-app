@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Board, Hands, Player, CapturedPieceType} from "@/types/shogi";
 import { pieceNames, promotedPieceNames, createPiece } from "@/lib/piece";
-import { getMovableSquares, canPromote, canDropPiece } from "@/lib/moves";
+import { getMovableSquares, canPromote, canDropPiece, getAttackSquares } from "@/lib/moves";
 import { isInCheck, isLegalMove, isCheckmate } from "@/lib/check";
 
 
@@ -67,12 +67,32 @@ export default function Board({ board }: BoardProps) {
 
         if (!position) return [];
 
-        return getMovableSquares(
+        return getAttackSquares(
             currentBoard,
             position.row,
             position.col
         );
     });
+
+    const dropSquares =
+        selectedHandPiece
+            ? currentBoard.flatMap((row, rowIndex) =>
+                row
+                    .map((piece, colIndex) => ({
+                        row: rowIndex,
+                        col: colIndex,
+                    }))
+                    .filter(({ row, col }) =>
+                        canDropPiece(
+                            currentBoard,
+                            selectedHandPiece.type,
+                            selectedHandPiece.player,
+                            row,
+                            col
+                        )
+                    )
+            )
+            : [];
     
     
 
@@ -146,6 +166,7 @@ export default function Board({ board }: BoardProps) {
                 square.col === colIndex
         );
 
+
         // ===== 効き表示モード =====
 
 
@@ -209,20 +230,11 @@ export default function Board({ board }: BoardProps) {
             // 持ち駒を打つ
             const newBoard = currentBoard.map((row) => [...row]);
 
-
-            // newBoard[rowIndex][colIndex] = createPiece(
-            //     selectedHandPiece.type,
-            //     selectedHandPiece.player
-            // );
-
             const newPiece = createPiece(
                 selectedHandPiece.type,
                 selectedHandPiece.player
             );
 
-
-            console.log("打った駒:", newPiece);
-            console.log("現在のattackPieces:", attackPieces);
 
             newBoard[rowIndex][colIndex] = newPiece;
 
@@ -464,13 +476,32 @@ export default function Board({ board }: BoardProps) {
 
                         <div className="board-controls">
 
-                            <button onClick={() => setIsAttackMode(!isAttackMode)}>
-                                {isAttackMode ? "通常モード" : "効き表示モード"}
-                            </button>
+                            <div className="mode-switch">
+                                <div
+                                    className={`mode-switch-slider ${
+                                        isAttackMode ? "attack" : "normal"
+                                    }`}
+                                />
+
+                                <button
+                                    className={!isAttackMode ? "active" : ""}
+                                    onClick={() => setIsAttackMode(false)}
+                                >
+                                    通常モード
+                                </button>
+
+                                <button
+                                    className={isAttackMode ? "active" : ""}
+                                    onClick={() => setIsAttackMode(true)}
+                                >
+                                    効き表示
+                                </button>
+                            </div>
 
                             <button>
                                 全体効き表示
                             </button>
+
 
                         </div>
 
@@ -503,6 +534,13 @@ export default function Board({ board }: BoardProps) {
                                             square.col === colIndex
                                     );
 
+                                    
+                                    const isDrop = dropSquares.some(
+                                        (square) =>
+                                            square.row === rowIndex &&
+                                            square.col === colIndex
+                                    );
+
                                     // ===== 攻撃対象として選択されているマスか判定 =====
                                     const isAttack = attackSquares.some(
                                         (square) =>
@@ -527,7 +565,7 @@ export default function Board({ board }: BoardProps) {
                                             }}
                                         >
                                             <div
-                                                className={`square-overlay ${isMovable ? "movable" : ""} ${isAttack ? "attack" : ""}`}
+                                                className={`square-overlay ${isMovable || isDrop ? "movable" : ""} ${isAttack ? "attack" : ""}`}
                                             />
 
                                             {piece && (

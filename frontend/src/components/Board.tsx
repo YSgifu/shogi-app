@@ -772,7 +772,7 @@ export default function Board({ board }: BoardProps) {
 
                 <div className="game-layout">
 
-                    <div className="hand gote-hand">
+                    <div className="hand top-hand">
                         <div className="hand-pieces">
                             {Object.entries(hands.gote).map(([type, count]) =>
                                 count > 0 ? (
@@ -806,15 +806,17 @@ export default function Board({ board }: BoardProps) {
                         </div>
                     </div>
 
-                    <div
-                        className={`current-player ${
-                            currentPlayer === "sente"
-                                ? "sente-turn"
-                                : "gote-turn"
-                        }`}
-                    >
-                        {currentPlayer === "sente" ? "先手の番" : "後手の番"}
-                    </div>
+                    {!winner && (
+                        <div
+                            className={`current-player ${
+                                currentPlayer === "sente"
+                                    ? "sente-turn"
+                                    : "gote-turn"
+                            }`}
+                        >
+                            {currentPlayer === "sente" ? "先手の番" : "後手の番"}
+                        </div>
+                    )}
 
 
                     {/* 盤面 */}
@@ -1035,7 +1037,7 @@ export default function Board({ board }: BoardProps) {
                         </div>
                     )}
 
-                    <div className="hand sente-hand">
+                    <div className="hand bottom-hand">
                         <div className="hand-pieces">
                             {Object.entries(hands.sente).map(([type, count]) =>
                                 count > 0 ? (
@@ -1071,68 +1073,68 @@ export default function Board({ board }: BoardProps) {
                     </div>
                 </div>
 
+                <div className="board-controls">
+                    <div className="mode-switch">
+                        <div
+                            className={`mode-switch-slider ${
+                                isAttackMode ? "attack" : "normal"
+                            }`}
+                        />
+
+                        <button
+                            className={!isAttackMode ? "active" : ""}
+                            onClick={() => setIsAttackMode(false)}
+                        >
+                            通常モード
+                        </button>
+
+                        <button
+                            className={isAttackMode ? "active" : ""}
+                            onClick={() => setIsAttackMode(true)}
+                        >
+                            効き表示モード
+                        </button>
+                    </div>
+
+                    <div className="attack-controls">
+                        <div className="attack-controls-title">
+                            一括表示
+                        </div>
+                        <div className="attack-controls-buttons">
+                            <button
+                                className="attack-all-sente"
+                                onClick={() => showAllAttackPieces("sente")}
+                            >
+                                先手
+                            </button>
+
+                            <button
+                                className="attack-all-gote"
+                                onClick={() => showAllAttackPieces("gote")}
+                            >
+                                後手
+                            </button>
+
+                            <button
+                                className="attack-clear"
+                                onClick={clearAttackPieces}
+                            >
+                                消す
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="game-controls">
+                        <button onClick={() => undoMove(1)}>
+                            一手戻す
+                        </button>
+                    </div>
+
+                </div>
+
             </div>
 
             {/* 盤面外 */}
-
-            <div className="board-controls">
-                <div className="mode-switch">
-                    <div
-                        className={`mode-switch-slider ${
-                            isAttackMode ? "attack" : "normal"
-                        }`}
-                    />
-
-                    <button
-                        className={!isAttackMode ? "active" : ""}
-                        onClick={() => setIsAttackMode(false)}
-                    >
-                        通常モード
-                    </button>
-
-                    <button
-                        className={isAttackMode ? "active" : ""}
-                        onClick={() => setIsAttackMode(true)}
-                    >
-                        効き表示モード
-                    </button>
-                </div>
-
-                <div className="attack-controls">
-                    <div className="attack-controls-title">
-                        一括表示
-                    </div>
-                    <div className="attack-controls-buttons">
-                        <button
-                            className="attack-all-sente"
-                            onClick={() => showAllAttackPieces("sente")}
-                        >
-                            先手
-                        </button>
-
-                        <button
-                            className="attack-all-gote"
-                            onClick={() => showAllAttackPieces("gote")}
-                        >
-                            後手
-                        </button>
-
-                        <button
-                            className="attack-clear"
-                            onClick={clearAttackPieces}
-                        >
-                            消す
-                        </button>
-                    </div>
-                </div>
-
-                <div className="game-controls">
-                    <button onClick={() => undoMove(1)}>
-                        一手戻す
-                    </button>
-                </div>
-
-            </div>
 
             <div className="move-history">
                 <h4>棋譜</h4>

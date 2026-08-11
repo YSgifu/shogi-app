@@ -72,29 +72,30 @@ a {
 .game-area {
     position: relative;
 
-    display: flex;
-    justify-content: center;
+    display: grid;
+
+    grid-template-columns:
+        minmax(80px, 1fr)
+        auto
+        minmax(80px, 1fr);
+
+    grid-template-rows:
+        1fr
+        1fr;
+
+    grid-template-areas:
+        "top-hand board current-player"
+        "controls board bottom-hand";
+
     align-items: center;
+
+    gap: 12px 10px;
 
     margin-top: 20px;
 }
 
 .game-layout {
-    display: grid;
-
-    grid-template-columns:
-        minmax(120px, 1fr)
-        auto
-        minmax(120px, 1fr);
-
-    grid-template-rows: 1fr 1fr;
-
-    grid-template-areas:
-        "gote-hand board current-player"
-        "controls board sente-hand";
-
-    align-items: stretch;
-    gap: 24px;
+    display: contents;
 }
 
 /* =========================================================
@@ -128,22 +129,22 @@ a {
 }
 
 .current-player {
-    padding: 10px 18px;
-    border-radius: 10px;
+    grid-area: current-player;
+    padding: 10px 30px;
+    border-radius: 14px;
 
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 24px;
+    font-weight: 700;
 
     white-space: nowrap;
-
-    justify-self: center;
 
     transition:
         background-color 0.4s ease,
         color 0.4s ease;
 
-    align-self: center; 
+    align-self: start;
     justify-self: center;
+
     width: fit-content;
     height: fit-content;
 }
@@ -368,14 +369,18 @@ a {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18);
 }
 
-.sente-hand {
-    grid-area: sente-hand;
-    align-self: flex-end;
+.bottom-hand {
+    grid-area: bottom-hand;
+
+    align-self: end;
+    justify-self: center;
 }
 
-.gote-hand {
-    grid-area: gote-hand;
-    align-self: flex-start;
+.top-hand {
+    grid-area: top-hand;
+
+    align-self: start;
+    justify-self: center;
 }
 
 /* =========================================================
@@ -386,7 +391,7 @@ a {
     grid-area: controls;
 
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
 
@@ -520,9 +525,9 @@ a {
 
 .attack-controls {
     display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
 
     padding: 8px 10px;
 
@@ -544,6 +549,8 @@ a {
     font-weight: 700;
     letter-spacing: 0.08em;
     color: #77716a;
+
+    text-align: center;
 }
 
 .attack-controls-buttons {
@@ -766,6 +773,7 @@ a {
 }
 
 .winner-message {
+    grid-area: current-player;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -787,7 +795,7 @@ a {
     -webkit-backdrop-filter: blur(8px);
 
     text-align: center;
-    align-self: center;
+    align-self: start;
     justify-self: center;
     width: fit-content;
     height: fit-content;
@@ -1020,6 +1028,13 @@ a {
 
     .game-area {
         width: 100%;
+
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+
+        gap: 10px;
+
         margin-top: 0;
     }
 
@@ -1031,12 +1046,13 @@ a {
         align-items: center;
 
         gap: 10px;
+        display: contents;
     }
 
     /* ===== 後手持ち駒 ===== */
 
-    .gote-hand {
-        order: 1;
+    .top-hand {
+        order: 2;
 
         width: 100%;
         height: 64px;
@@ -1047,7 +1063,7 @@ a {
     /* ===== 将棋盤 ===== */
 
     .board-container {
-        order: 2;
+        order: 3;
 
         width: 100vw;
         max-width: none;
@@ -1055,8 +1071,8 @@ a {
 
     /* ===== 先手持ち駒 ===== */
 
-    .sente-hand {
-        order: 3;
+    .bottom-hand {
+        order: 4;
 
         width: 100%;
         height: 64px;
@@ -1066,12 +1082,15 @@ a {
 
     /* ===== 勝者表示 ===== */
     .winner-message {
-        order: 4;
+        order: 1;
 
-        width: calc(100vw - 20px);
+        width: fit-content;
+        max-width: calc(100vw - 20px);
+
         box-sizing: border-box;
 
-        gap: 10px;
+        text-align: center;
+        align-self: center;
     }
 
     .winner-message > div {
@@ -1085,7 +1104,7 @@ a {
     /* ===== 手番 ===== */
 
     .current-player {
-        order: 5;
+        order: 1;
 
         position: static;
         transform: none;
@@ -1097,6 +1116,12 @@ a {
         font-weight: 600;
 
         white-space: nowrap;
+
+        width: fit-content;
+        height: fit-content;
+
+        align-self: center;
+        justify-self: center;
     }
 
     /* ===== 持ち駒 ===== */
@@ -1143,6 +1168,7 @@ a {
     /* ===== 操作UI ===== */
 
     .board-controls {
+        order: 5;
         width: calc(100vw - 20px);
 
         flex-direction: column;
@@ -1151,9 +1177,23 @@ a {
         gap: 8px;
     }
 
+    .attack-controls {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .attack-controls-title {
+        text-align: left;
+    }
+
     .mode-switch {
         width: 100%;
         height: 48px;
+    }
+
+    .move-history {
+        order: 6;
     }
 
     /* ===== タッチ操作 ===== */

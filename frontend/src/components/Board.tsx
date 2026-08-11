@@ -806,6 +806,16 @@ export default function Board({ board }: BoardProps) {
                         </div>
                     </div>
 
+                    <div
+                        className={`current-player ${
+                            currentPlayer === "sente"
+                                ? "sente-turn"
+                                : "gote-turn"
+                        }`}
+                    >
+                        {currentPlayer === "sente" ? "先手の番" : "後手の番"}
+                    </div>
+
 
                     {/* 盤面 */}
                     <div className="board-container">
@@ -1025,17 +1035,6 @@ export default function Board({ board }: BoardProps) {
                         </div>
                     )}
 
-                    <div
-
-                        className={`current-player ${
-                            currentPlayer === "sente"
-                                ? "sente-turn"
-                                : "gote-turn"
-                        }`}
-                    >
-                        {currentPlayer === "sente" ? "先手の番" : "後手の番"}
-                    </div>
-
                     <div className="hand sente-hand">
                         <div className="hand-pieces">
                             {Object.entries(hands.sente).map(([type, count]) =>
@@ -1095,7 +1094,7 @@ export default function Board({ board }: BoardProps) {
                         className={isAttackMode ? "active" : ""}
                         onClick={() => setIsAttackMode(true)}
                     >
-                        効き表示
+                        効き表示モード
                     </button>
                 </div>
 
@@ -1127,9 +1126,11 @@ export default function Board({ board }: BoardProps) {
                     </div>
                 </div>
 
-                <button onClick={() => undoMove(1)}>
-                    一手戻す
-                </button>
+                <div className="game-controls">
+                    <button onClick={() => undoMove(1)}>
+                        一手戻す
+                    </button>
+                </div>
 
             </div>
 

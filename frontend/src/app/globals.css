@@ -14,7 +14,7 @@
 
 /* =========================================================
     Base
-   ========================================================= */
+========================================================= */
 
 html {
     height: 100%;
@@ -54,7 +54,7 @@ a {
 
 /* =========================================================
     App Layout
-   ========================================================= */
+========================================================= */
 
 .shogi-app {
     min-height: 100vh;
@@ -69,18 +69,6 @@ a {
     transition: background-color 0.5s ease;
 }
 
-.game-layout {
-    display: grid;
-    grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr);
-    grid-template-rows: 1fr 1fr;
-    grid-template-areas:
-        "gote-hand board current-player"
-        "controls board sente-hand";
-
-    align-items: stretch;
-    gap: 24px;
-}
-
 .game-area {
     position: relative;
 
@@ -91,9 +79,27 @@ a {
     margin-top: 20px;
 }
 
+.game-layout {
+    display: grid;
+
+    grid-template-columns:
+        minmax(120px, 1fr)
+        auto
+        minmax(120px, 1fr);
+
+    grid-template-rows: 1fr 1fr;
+
+    grid-template-areas:
+        "gote-hand board current-player"
+        "controls board sente-hand";
+
+    align-items: stretch;
+    gap: 24px;
+}
+
 /* =========================================================
-    Theme
-   ========================================================= */
+    Theme / Current Player
+========================================================= */
 
 .sente-theme {
     --theme-bg: #f0f7ff;
@@ -122,30 +128,29 @@ a {
 }
 
 .current-player {
-    grid-area: current-player;
+    padding: 10px 18px;
+    border-radius: 10px;
 
-    position: static;
-
-    padding: 16px 24px;
-    border-radius: 12px;
-
-    font-size: 20px;
-    font-weight: bold;
+    font-size: 16px;
+    font-weight: 600;
 
     white-space: nowrap;
 
-    align-self: center;
     justify-self: center;
 
     transition:
         background-color 0.4s ease,
         color 0.4s ease;
-}
 
+    align-self: center; 
+    justify-self: center;
+    width: fit-content;
+    height: fit-content;
+}
 
 /* =========================================================
     Board
-   ========================================================= */
+========================================================= */
 
 .board-container {
     grid-area: board;
@@ -192,13 +197,9 @@ a {
     background-color: var(--promotion-zone);
 }
 
-.square-overlay.selected-square-overlay {
-    background-color: var(--move);
-}
-
 /* =========================================================
-    Board Overlays
-   ========================================================= */
+    Board Overlays / Highlights
+========================================================= */
 
 .square-overlay {
     position: absolute;
@@ -207,6 +208,10 @@ a {
     z-index: 1;
 
     pointer-events: none;
+}
+
+.square-overlay.selected-square-overlay {
+    background-color: var(--move);
 }
 
 .square-overlay.movable {
@@ -233,10 +238,9 @@ a {
     background-color: var(--move);
 }
 
-
 /* =========================================================
     Pieces
-   ========================================================= */
+========================================================= */
 
 .piece {
     position: relative;
@@ -307,7 +311,7 @@ a {
 
 /* =========================================================
     Hands
-   ========================================================= */
+========================================================= */
 
 .hand {
     width: 240px;
@@ -376,7 +380,7 @@ a {
 
 /* =========================================================
     Board Controls
-   ========================================================= */
+========================================================= */
 
 .board-controls {
     grid-area: controls;
@@ -389,55 +393,7 @@ a {
     gap: 10px;
 }
 
-/* 通常ボタン */
-
-.board-controls > button {
-    padding: 10px 16px;
-
-    font-size: 14px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-
-    color: #3f3f3f;
-
-    background: rgba(245, 243, 238, 0.88);
-
-    border: 1px solid rgba(255, 255, 255, 0.9);
-    border-radius: 10px;
-
-    box-shadow:
-        0 3px 8px rgba(0, 0, 0, 0.1),
-        inset 0 1px 1px rgba(255, 255, 255, 0.8);
-
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-
-    cursor: pointer;
-
-    transition:
-        transform 0.15s ease,
-        background-color 0.15s ease,
-        box-shadow 0.15s ease;
-}
-
-.board-controls > button:hover {
-    background: rgba(250, 248, 244, 0.96);
-
-    box-shadow:
-        0 5px 12px rgba(0, 0, 0, 0.13),
-        inset 0 1px 1px rgba(255, 255, 255, 0.9);
-
-    transform: translateY(-1px);
-}
-
-.board-controls > button:active {
-    transform: translateY(1px);
-
-    box-shadow:
-        0 2px 5px rgba(0, 0, 0, 0.1);
-}
-
-/* モード切替 */
+/* ----- Mode Switch ----- */
 
 .mode-switch {
     position: relative;
@@ -473,7 +429,7 @@ a {
     color: var(--foreground);
 
     font-size: 15px;
-    font-weight: 600;
+    font-weight: 500;
 
     cursor: pointer;
 
@@ -519,9 +475,147 @@ a {
     transform: translateX(100%);
 }
 
+/* ----- Game Controls ----- */
+
+.game-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.game-controls > button {
+    padding: 9px 18px;
+
+    border: 1px solid rgba(170, 162, 152, 0.65);
+    border-radius: 7px;
+
+    background: rgba(255, 255, 255, 0.55);
+    color: #3f3f3f;
+
+    font-size: 13px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+        background-color 0.15s ease,
+        transform 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.game-controls > button:hover {
+    background: rgba(255, 255, 255, 0.75);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+}
+
+.game-controls > button:active {
+    transform: translateY(1px);
+    box-shadow: none;
+}
+
+/* =========================================================
+    Attack Controls
+========================================================= */
+
+.attack-controls {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+
+    padding: 8px 10px;
+
+    border: 1px solid var(--grid-line);
+    border-radius: 10px;
+
+    background: rgba(245, 243, 238, 0.72);
+
+    box-shadow:
+        0 3px 8px rgba(0, 0, 0, 0.07),
+        inset 0 1px 1px rgba(255, 255, 255, 0.8);
+
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.attack-controls-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #77716a;
+}
+
+.attack-controls-buttons {
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+}
+
+.attack-controls button {
+    min-width: 72px;
+    padding: 9px 14px;
+
+    border: 1px solid rgba(170, 162, 152, 0.65);
+    border-radius: 7px;
+
+    background: rgba(255, 255, 255, 0.55);
+    color: #3f3f3f;
+
+    font-size: 13px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+        background-color 0.15s ease,
+        transform 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.attack-controls button:hover {
+    background: rgba(255, 255, 255, 0.75);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+}
+
+.attack-controls button:active {
+    transform: translateY(1px);
+    box-shadow: none;
+}
+
+/* =========================================================
+    Move History
+========================================================= */
+
+.move-history {
+    width: min(90vw, 700px);
+    max-width: 100%;
+
+    padding: 10px 14px;
+
+    border: 1px solid var(--grid-line);
+    border-radius: 10px;
+
+    background: rgba(245, 243, 238, 0.72);
+
+    box-shadow:
+        0 3px 8px rgba(0, 0, 0, 0.07),
+        inset 0 1px 1px rgba(255, 255, 255, 0.8);
+
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.move-history-list {
+    display: flex;
+    gap: 16px;
+    white-space: nowrap;
+}
+
 /* =========================================================
     Messages / Preview
-   ========================================================= */
+========================================================= */
 
 .preview-message {
     position: absolute;
@@ -611,7 +705,7 @@ a {
 
 /* =========================================================
     Winner / Checkmate
-   ========================================================= */
+========================================================= */
 
 .win-overlay {
     position: absolute;
@@ -672,34 +766,94 @@ a {
 }
 
 .winner-message {
-    padding: 10px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
 
-    font-size: 20px;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-
-    white-space: nowrap;
+    padding: 10px 14px;
 
     color: var(--theme-text);
+    background: rgba(245, 243, 238, 0.72);
 
-    background: rgba(255, 255, 255, 0.72);
-
-    border: 2px solid var(--theme-accent);
-    border-radius: 12px;
+    border: 1px solid var(--grid-line);
+    border-radius: 10px;
 
     box-shadow:
-        0 6px 18px rgba(0, 0, 0, 0.18),
-        0 0 0 4px color-mix(
-            in srgb,
-            var(--theme-accent) 16%,
-            transparent
-        ),
-        inset 0 1px 2px rgba(255, 255, 255, 0.85);
+        0 3px 8px rgba(0, 0, 0, 0.07),
+        inset 0 1px 1px rgba(255, 255, 255, 0.8);
 
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 
     text-align: center;
+    align-self: center;
+    justify-self: center;
+    width: fit-content;
+    height: fit-content;
+}
+
+.winner-message > div {
+    font-size: 18px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.winner-message button {
+    padding: 9px 14px;
+
+    border: 1px solid rgba(170, 162, 152, 0.65);
+    border-radius: 7px;
+
+    background: rgba(255, 255, 255, 0.55);
+    color: #3f3f3f;
+
+    font-size: 13px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+        background-color 0.15s ease,
+        transform 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.winner-message > div {
+    font-size: 18px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.winner-message button {
+    padding: 9px 14px;
+
+    border: 1px solid rgba(170, 162, 152, 0.65);
+    border-radius: 7px;
+
+    background: rgba(255, 255, 255, 0.55);
+    color: #3f3f3f;
+
+    font-size: 13px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+        background-color 0.15s ease,
+        transform 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.winner-message button:hover {
+    background: rgba(255, 255, 255, 0.75);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+}
+
+.winner-message button:active {
+    transform: translateY(1px);
+    box-shadow: none;
 }
 
 .checkmate-overlay {
@@ -802,7 +956,7 @@ a {
 
 /* =========================================================
     Animations
-   ========================================================= */
+========================================================= */
 
 @keyframes win-pop {
     0% {
@@ -853,93 +1007,11 @@ a {
     }
 }
 
-
-/* =============================新規追加============================= */
-.attack-controls {
-    width: 280px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-
-    padding: 10px;
-
-    border: 1px solid var(--grid-line);
-    border-radius: 10px;
-
-    background: rgba(245, 243, 238, 0.72);
-
-    box-shadow:
-        0 3px 8px rgba(0, 0, 0, 0.07),
-        inset 0 1px 1px rgba(255, 255, 255, 0.8);
-
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-}
-
-.attack-controls-title {
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    color: #77716a;
-}
-
-.attack-controls-buttons {
-    display: flex;
-    flex-direction: row;
-    gap: 6px;
-}
-
-.attack-controls button {
-    flex: 1;
-    padding: 8px 6px;
-
-    border: 1px solid rgba(170, 162, 152, 0.65);
-    border-radius: 7px;
-
-    background: rgba(255, 255, 255, 0.55);
-    color: #3f3f3f;
-
-    font-size: 12px;
-    font-weight: 600;
-
-    cursor: pointer;
-
-    transition:
-        background-color 0.15s ease,
-        transform 0.15s ease,
-        box-shadow 0.15s ease;
-}
-
-.move-history {
-    width: min(90vw, 700px);
-    max-width: 100%;
-
-    padding: 10px 14px;
-
-    border: 1px solid var(--grid-line);
-    border-radius: 10px;
-
-    background: rgba(245, 243, 238, 0.72);
-
-    box-shadow:
-        0 3px 8px rgba(0, 0, 0, 0.07),
-        inset 0 1px 1px rgba(255, 255, 255, 0.8);
-
-    overflow-x: auto;
-    white-space: nowrap;
-}
-
-.move-history-list {
-    display: flex;
-    gap: 16px;
-    white-space: nowrap;
-}
-
-
-/* ============================スマホ対応============================ */
+/* =========================================================
+    Mobile
+========================================================= */
 
 @media (max-width: 600px) {
-
     .shogi-app {
         width: 100%;
         padding: 12px 0px 20px;
@@ -993,9 +1065,21 @@ a {
     }
 
     /* ===== 勝者表示 ===== */
-
     .winner-message {
         order: 4;
+
+        width: calc(100vw - 20px);
+        box-sizing: border-box;
+
+        gap: 10px;
+    }
+
+    .winner-message > div {
+        font-size: 16px;
+    }
+
+    .winner-message button {
+        flex-shrink: 0;
     }
 
     /* ===== 手番 ===== */
@@ -1063,6 +1147,7 @@ a {
 
         flex-direction: column;
         align-items: center;
+
         gap: 8px;
     }
 
@@ -1071,14 +1156,11 @@ a {
         height: 48px;
     }
 
-    .board-controls > button {
-        width: 100%;
-    }
-
     /* ===== タッチ操作 ===== */
 
     .square {
         touch-action: manipulation;
+
         border-width: 0.5px;
         border-color: #8f8980;
     }
@@ -1086,5 +1168,4 @@ a {
     .piece {
         touch-action: manipulation;
     }
-
 }

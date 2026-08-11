@@ -52,12 +52,6 @@ a {
     text-decoration: none;
 }
 
-@media (prefers-color-scheme: dark) {
-    html {
-        color-scheme: dark;
-    }
-}
-
 /* =========================================================
     App Layout
    ========================================================= */
@@ -78,6 +72,10 @@ a {
 .game-layout {
     display: grid;
     grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr);
+    grid-template-rows: 1fr 1fr;
+    grid-template-areas:
+        "gote-hand board current-player"
+        "controls board sente-hand";
 
     align-items: stretch;
     gap: 24px;
@@ -91,25 +89,6 @@ a {
     align-items: center;
 
     margin-top: 20px;
-}
-
-.left-panel,
-.right-panel {
-    display: flex;
-    flex-direction: column;
-
-    height: min(90vw, 700px);
-}
-
-.left-panel {
-    align-items: flex-end;
-    justify-content: flex-start;
-
-    gap: 40px;
-}
-
-.right-panel {
-    position: relative;
 }
 
 /* =========================================================
@@ -143,12 +122,9 @@ a {
 }
 
 .current-player {
-    position: absolute;
+    grid-area: current-player;
 
-    left: 50%;
-    top: 50%;
-
-    transform: translate(-50%, -50%);
+    position: static;
 
     padding: 16px 24px;
     border-radius: 12px;
@@ -158,16 +134,21 @@ a {
 
     white-space: nowrap;
 
+    align-self: center;
+    justify-self: center;
+
     transition:
         background-color 0.4s ease,
         color 0.4s ease;
 }
+
 
 /* =========================================================
     Board
    ========================================================= */
 
 .board-container {
+    grid-area: board;
     position: relative;
 
     width: min(90vw, 700px);
@@ -320,8 +301,6 @@ a {
     background-color: #ebe7df;
 
     padding: 8px;
-
-    box-sizing: border-box;
     user-select: none;
 }
 
@@ -370,15 +349,12 @@ a {
 }
 
 .sente-hand {
-    position: absolute;
-
-    left: 50%;
-    bottom: 0;
-
-    transform: translateX(-50%);
+    grid-area: sente-hand;
+    align-self: flex-end;
 }
 
 .gote-hand {
+    grid-area: gote-hand;
     align-self: flex-start;
 }
 
@@ -387,6 +363,7 @@ a {
    ========================================================= */
 
 .board-controls {
+    grid-area: controls;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -843,4 +820,155 @@ a {
         opacity: 1;
         transform: scale(1);
     }
+}
+
+
+/* ============================スマホ対応============================ */
+
+@media (max-width: 600px) {
+
+    .shogi-app {
+        width: 100%;
+        padding: 12px 0px 20px;
+        gap: 12px;
+    }
+
+    .game-area {
+        width: 100%;
+        margin-top: 0;
+    }
+
+    .game-layout {
+        width: 100%;
+
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+
+        gap: 10px;
+    }
+
+    /* ===== 後手持ち駒 ===== */
+
+    .gote-hand {
+        order: 1;
+
+        width: 100%;
+        height: 64px;
+
+        padding: 2px 6px;
+    }
+
+    /* ===== 将棋盤 ===== */
+
+    .board-container {
+        order: 2;
+
+        width: 100vw;
+        max-width: none;
+    }
+
+    /* ===== 先手持ち駒 ===== */
+
+    .sente-hand {
+        order: 3;
+
+        width: 100%;
+        height: 64px;
+
+        padding: 2px 6px;
+    }
+
+    /* ===== 勝者表示 ===== */
+
+    .winner-message {
+        order: 4;
+    }
+
+    /* ===== 手番 ===== */
+
+    .current-player {
+        order: 5;
+
+        position: static;
+        transform: none;
+
+        padding: 6px 14px;
+        border-radius: 8px;
+
+        font-size: 16px;
+        font-weight: 600;
+
+        white-space: nowrap;
+    }
+
+    /* ===== 持ち駒 ===== */
+
+    .hand-pieces {
+        width: 100%;
+        height: 100%;
+
+        display: flex;
+        flex-wrap: nowrap;
+
+        align-items: center;
+        justify-content: center;
+
+        gap: 2px;
+    }
+
+    .hand-piece {
+        width: 48px;
+        height: 62px;
+
+        flex: 0 0 48px;
+
+        touch-action: manipulation;
+    }
+
+    .hand-piece .piece {
+        width: 72%;
+        height: 78%;
+
+        font-size: 22px;
+    }
+
+    .hand-count {
+        width: 22px;
+        height: 22px;
+
+        right: -3px;
+        bottom: -3px;
+
+        font-size: 14px;
+    }
+
+    /* ===== 操作UI ===== */
+
+    .board-controls {
+        width: calc(100vw - 20px);
+
+        align-items: center;
+        gap: 8px;
+    }
+
+    .mode-switch {
+        width: 100%;
+        height: 48px;
+    }
+
+    .board-controls > button {
+        width: 100%;
+    }
+
+    /* ===== タッチ操作 ===== */
+
+    .square {
+        touch-action: manipulation;
+    }
+
+    .piece {
+        touch-action: manipulation;
+    }
+
 }

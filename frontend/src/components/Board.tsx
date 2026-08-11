@@ -228,29 +228,62 @@ export default function Board({ board }: BoardProps) {
             }
 
             // 持ち駒を打つ
+
+            // 現在の状態を保存
+            setPreviousBoard(currentBoard);
+            setPreviousHands(hands);
+
+            // 盤面をコピー
             const newBoard = currentBoard.map((row) => [...row]);
 
+            // 持ち駒をコピー
+            const newHands = {
+                sente: { ...hands.sente },
+                gote: { ...hands.gote },
+            };
+
+            // 持ち駒から駒を生成
             const newPiece = createPiece(
                 selectedHandPiece.type,
                 selectedHandPiece.player
             );
 
-
+            // 盤上に配置
             newBoard[rowIndex][colIndex] = newPiece;
 
-            setCurrentBoard(newBoard);
+            // 持ち駒を1枚減らす
+            newHands[selectedHandPiece.player][selectedHandPiece.type] -= 1;
 
-            setHands((prev) => ({
-                ...prev,
-                [selectedHandPiece.player]: {
-                    ...prev[selectedHandPiece.player],
-                    [selectedHandPiece.type]:
-                        prev[selectedHandPiece.player][selectedHandPiece.type] - 1,
-                },
-            }));
+            // 仮移動後の相手
+            const opponent =
+                selectedHandPiece.player === "sente"
+                    ? "gote"
+                    : "sente";
+
+            // 王手・詰み判定
+            if (isCheckmate(newBoard, opponent, newHands)) {
+                setCheckmatePlayer(selectedHandPiece.player);
+                setShowCheckmateDialog(true);
+            } else if (isInCheck(newBoard, opponent)) {
+                setMessage("王手です");
+            }
+
+            // 仮移動状態を反映
+            setCurrentBoard(newBoard);
+            setHands(newHands);
 
             setSelectedHandPiece(null);
-            switchPlayer();
+
+            setSelectedSquare({
+                row: rowIndex,
+                col: colIndex,
+            });
+
+            setMovableSquares([]);
+
+            setCanPromotePreview(false);
+
+            setIsPreviewing(true);
 
             return;
         }
@@ -373,6 +406,16 @@ export default function Board({ board }: BoardProps) {
 
         if (piece.player !== currentPlayer) return;
 
+        // 選択中の駒をもう一度クリックしたら選択解除
+        if (
+            selectedSquare?.row === rowIndex &&
+            selectedSquare?.col === colIndex
+        ) {
+            setSelectedSquare(null);
+            setMovableSquares([]);
+            return;
+        }
+
         setSelectedSquare({
             row: rowIndex,
             col: colIndex,
@@ -437,77 +480,42 @@ export default function Board({ board }: BoardProps) {
 
                 <div className="game-layout">
 
-                    {/* 左列 */}
-                    <div className="left-panel">
-
-                        <div className="hand gote-hand">
-                            <div className="hand-pieces">
-                                {Object.entries(hands.gote).map(([type, count]) =>
-                                    count > 0 ? (
-                                        <div
-                                            key={type}
-                                            className={`hand-piece gote ${
-                                                selectedHandPiece?.type === type &&
-                                                selectedHandPiece?.player === "gote"
-                                                    ? "selected"
-                                                    : ""
-                                            }`}
-                                            onClick={() =>
-                                                handleHandPieceClick(
-                                                    type as CapturedPieceType,
-                                                    "gote"
-                                                )
-                                            }
-                                        >
-                                            <div className="piece gote">
-                                                {pieceNames[type as keyof typeof pieceNames]}
-                                            </div>
-
-                                            {count > 1 && (
-                                                <span className="hand-count">
-                                                    {count}
-                                                </span>
-                                            )}
+                    <div className="hand gote-hand">
+                        <div className="hand-pieces">
+                            {Object.entries(hands.gote).map(([type, count]) =>
+                                count > 0 ? (
+                                    <div
+                                        key={type}
+                                        className={`hand-piece gote ${
+                                            selectedHandPiece?.type === type &&
+                                            selectedHandPiece?.player === "gote"
+                                                ? "selected"
+                                                : ""
+                                        }`}
+                                        onClick={() =>
+                                            handleHandPieceClick(
+                                                type as CapturedPieceType,
+                                                "gote"
+                                            )
+                                        }
+                                    >
+                                        <div className="piece gote">
+                                            {pieceNames[type as keyof typeof pieceNames]}
                                         </div>
-                                    ) : null
-                                )}
-                            </div>
+
+                                        {count > 1 && (
+                                            <span className="hand-count">
+                                                {count}
+                                            </span>
+                                        )}
+                                    </div>
+                                ) : null
+                            )}
                         </div>
-
-                        <div className="board-controls">
-
-                            <div className="mode-switch">
-                                <div
-                                    className={`mode-switch-slider ${
-                                        isAttackMode ? "attack" : "normal"
-                                    }`}
-                                />
-
-                                <button
-                                    className={!isAttackMode ? "active" : ""}
-                                    onClick={() => setIsAttackMode(false)}
-                                >
-                                    通常モード
-                                </button>
-
-                                <button
-                                    className={isAttackMode ? "active" : ""}
-                                    onClick={() => setIsAttackMode(true)}
-                                >
-                                    効き表示
-                                </button>
-                            </div>
-
-                            <button>
-                                全体効き表示
-                            </button>
-
-
-                        </div>
-
                     </div>
 
-                    {/* 中央列 */}
+
+                    {/* 盤面 */}
                     <div className="board-container">
 
                         <div className="board">
@@ -729,68 +737,88 @@ export default function Board({ board }: BoardProps) {
 
                     </div>
 
-                    {/* 右列 */}
-                    <div className="right-panel">
-
-                        {winner && !showWinAnimation && (
-                            <div className="winner-message">
-                                {winner === "sente"
-                                    ? "先手の勝ち！"
-                                    : "後手の勝ち！"}
-                            </div>
-                        )}
-                        <div
-
-                            className={`current-player ${
-                                currentPlayer === "sente"
-                                    ? "sente-turn"
-                                    : "gote-turn"
-                            }`}
-                        >
-                            {currentPlayer === "sente" ? "先手の番" : "後手の番"}
+                    {winner && !showWinAnimation && (
+                        <div className="winner-message">
+                            {winner === "sente"
+                                ? "先手の勝ち！"
+                                : "後手の勝ち！"}
                         </div>
+                    )}
+                    <div
 
-                        <div className="hand sente-hand">
-                            <div className="hand-pieces">
-                                {Object.entries(hands.sente).map(([type, count]) =>
-                                    count > 0 ? (
-                                        <div
-                                            key={type}
-                                            className={`hand-piece sente ${
-                                                selectedHandPiece?.type === type &&
-                                                selectedHandPiece?.player === "sente"
-                                                    ? "selected"
-                                                    : ""
-                                            }`}
-                                            onClick={() =>
-                                                handleHandPieceClick(
-                                                    type as CapturedPieceType,
-                                                    "sente"
-                                                )
-                                            }
-                                        >
-                                            <div className="piece sente">
-                                                {pieceNames[type as keyof typeof pieceNames]}
-                                            </div>
-
-                                            {count > 1 && (
-                                                <span className="hand-count">
-                                                    {count}
-                                                </span>
-                                            )}
-                                        </div>
-                                    ) : null
-                                )}
-                            </div>
-                        
-                        </div>
+                        className={`current-player ${
+                            currentPlayer === "sente"
+                                ? "sente-turn"
+                                : "gote-turn"
+                        }`}
+                    >
+                        {currentPlayer === "sente" ? "先手の番" : "後手の番"}
                     </div>
 
+                    <div className="hand sente-hand">
+                        <div className="hand-pieces">
+                            {Object.entries(hands.sente).map(([type, count]) =>
+                                count > 0 ? (
+                                    <div
+                                        key={type}
+                                        className={`hand-piece sente ${
+                                            selectedHandPiece?.type === type &&
+                                            selectedHandPiece?.player === "sente"
+                                                ? "selected"
+                                                : ""
+                                        }`}
+                                        onClick={() =>
+                                            handleHandPieceClick(
+                                                type as CapturedPieceType,
+                                                "sente"
+                                            )
+                                        }
+                                    >
+                                        <div className="piece sente">
+                                            {pieceNames[type as keyof typeof pieceNames]}
+                                        </div>
+
+                                        {count > 1 && (
+                                            <span className="hand-count">
+                                                {count}
+                                            </span>
+                                        )}
+                                    </div>
+                                ) : null
+                            )}
+                        </div>
+                    
+                    </div>
                 </div>
 
             </div>
 
             {/* 盤面外 */}
+
+            <div className="board-controls">
+                <div className="mode-switch">
+                    <div
+                        className={`mode-switch-slider ${
+                            isAttackMode ? "attack" : "normal"
+                        }`}
+                    />
+                    <button
+                        className={!isAttackMode ? "active" : ""}
+                        onClick={() => setIsAttackMode(false)}
+                    >
+                        通常モード
+                    </button>
+                    <button
+                        className={isAttackMode ? "active" : ""}
+                        onClick={() => setIsAttackMode(true)}
+                    >
+                        効き表示
+                    </button>
+                </div>
+                <button>
+                    全体効き表示
+                </button>
+            </div>
 
             {process.env.NODE_ENV === "development" && (
                 <button

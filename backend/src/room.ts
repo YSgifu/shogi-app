@@ -1,13 +1,26 @@
+type Player = "sente" | "gote";
+type Move = {
+    type: "move";
+    player: Player;
+    from: {
+        row: number;
+        col: number;
+    } | null;
+    to: {
+        row: number;
+        col: number;
+    };
+    promote: boolean;
+    piece?: string;
+};
+
 export class Room {
     private clients: {
         socket: WebSocket;
-        player: "sente" | "gote";
+        player: Player;
     }[] = [];
 
-    constructor(
-        private state: DurableObjectState,
-        private env: unknown
-    ) {}
+    private turn: Player = "sente";
 
     async fetch(request: Request): Promise<Response> {
         if (request.headers.get("Upgrade") !== "websocket") {
@@ -16,25 +29,20 @@ export class Room {
             });
         }
 
-        const pair = new WebSocketPair();
-
-        const client = pair[0];
-        const server = pair[1];
-
-        // プレイヤーを決める
-        let player: "sente" | "gote";
-
-        if (this.clients.length === 0) {
-            player = "sente";
-        } else if (this.clients.length === 1) {
-            player = "gote";
-        } else {
-            server.close(1008, "Room is full");
-
+        if (this.clients.length >= 2) {
             return new Response("Room is full", {
                 status: 403,
             });
         }
+
+        const pair = new WebSocketPair();
+        const client = pair[0];
+        const server = pair[1];
+
+        const player: Player =
+            this.clients.length === 0
+                ? "sente"
+                : "gote";
 
         server.accept();
 
@@ -43,7 +51,6 @@ export class Room {
             player,
         });
 
-        // 自分が先手か後手かを通知
         server.send(
             JSON.stringify({
                 type: "player-assigned",
@@ -52,11 +59,32 @@ export class Room {
         );
 
         server.addEventListener("message", (event) => {
-            console.log("received:", event.data);
+            const move: Move = JSON.parse(event.data);
+
+            const client = this.clients.find(
+                (client) => client.socket === server
+            );
+
+            if (!client) return;
+
+            if (move.player !== client.player) return;
+
+            if (move.player !== this.turn) return;
+
+            this.turn =
+                this.turn === "sente"
+                    ? "gote"
+                    : "sente";
+
+            const message = JSON.stringify({
+                type: "move",
+                move,
+                turn: this.turn,
+            });
 
             for (const client of this.clients) {
                 if (client.socket.readyState === WebSocket.OPEN) {
-                    client.socket.send(event.data);
+                    client.socket.send(message);
                 }
             }
         });

@@ -82,10 +82,60 @@ export default function OnlineBoard({
         } | null>(null);
     // 勝者用
     const [winner, setWinner] = useState<Player | null>(null);
+    // 自分のターンか否か
+    const isMyTurn = myPlayer !== null && myPlayer === turn;
+    // 仮の「自分が1人目か」を追加
+    const [isFirstPlayer, setIsFirstPlayer] = useState(false);
+    const previewPosition = previewMove?.to ?? null;
+    const [isAttackMode, setIsAttackMode] = useState(false);
+    const [attackPieces, setAttackPieces] = useState<number[]>([]);
 
     const boardRef = useRef<Board>(currentBoard);
     const handsRef = useRef<Hands>(hands);
 
+    const dropSquares =
+        selectedHandPiece
+            ? currentBoard.flatMap((row, rowIndex) =>
+                row
+                    .map((piece, colIndex) => ({
+                        row: rowIndex,
+                        col: colIndex,
+                    }))
+                    .filter(({ row, col }) =>
+                        canDropPiece(
+                            currentBoard,
+                            selectedHandPiece.type,
+                            selectedHandPiece.player,
+                            row,
+                            col
+                        )
+                    )
+            )
+            : [];
+
+    
+    // 効き表示 
+    const attackBoard = previewBoard ?? currentBoard;
+
+    const attackSquares = attackPieces.flatMap((pieceId) => {
+        const position = attackBoard
+            .flatMap((row, rowIndex) =>
+                row.map((piece, colIndex) => ({
+                    piece,
+                    row: rowIndex,
+                    col: colIndex,
+                }))
+            )
+            .find(({ piece }) => piece?.id === pieceId);
+
+        if (!position) return [];
+
+        return getAttackSquares(
+            attackBoard,
+            position.row,
+            position.col
+        );
+    });
 
 
     // ==================================================================================================
@@ -171,6 +221,11 @@ export default function OnlineBoard({
         socket.onmessage = (event) => {
             const message = JSON.parse(event.data);
 
+            if (message.type === "player-position") {
+                setIsFirstPlayer(message.isFirstPlayer);
+                return;
+            }
+
             if (message.type === "player-assigned") {
                 setMyPlayer(message.player);
                 return;
@@ -195,6 +250,20 @@ export default function OnlineBoard({
 
         return () => socket.close();
     }, [roomId]);
+
+    // ===== 先後を選択する処理 =====
+    const selectPlayer = (player: Player) => {
+        setMyPlayer(player);
+
+        const message = {
+            type: "player-choice",
+            player,
+        };
+
+        console.log("先後選択:", message);
+
+        socketRef.current?.send(JSON.stringify(message));
+    };
 
 
     // ===== Moveをサーバーへ送信し、自分の盤面にも反映する処理 =====
@@ -238,50 +307,57 @@ export default function OnlineBoard({
 
     // ==================================================================================================
 
-    // 通常状態のクリック時処理
-    function handleNormalClick(rowIndex: number, colIndex: number) {
-        const piece = currentBoard[rowIndex][colIndex];
-
-        if (!piece) return;
-
-        if (myPlayer !== turn) return;
-
-        if (piece.player !== myPlayer) return;
-
+    // 盤上の駒を選択する共通処理
+    function selectSquare(rowIndex: number, colIndex: number) {
         setSelectedSquare({
             row: rowIndex,
             col: colIndex,
         });
 
         setMovableSquares(
-            getMovableSquares(currentBoard, rowIndex, colIndex)
+            getMovableSquares(
+                currentBoard,
+                rowIndex,
+                colIndex
+            )
         );
+    }
+
+    // 盤上の駒の選択を解除する共通処理
+    function clearSquareSelection() {
+        setSelectedSquare(null);
+        setMovableSquares([]);
+    }
+    
+    // 通常状態のクリック時処理
+    function handleNormalClick(rowIndex: number, colIndex: number) {
+        const piece = currentBoard[rowIndex][colIndex];
+
+        if (!piece) return;
+        if (myPlayer !== turn) return;
+        if (piece.player !== myPlayer) return;
+
+        selectSquare(rowIndex, colIndex);
     }
 
     // 選択状態のクリック時処理
     function handleSelectedClick(rowIndex: number, colIndex: number) {
-        // =============== 仮移動中のクリック処理の一端 ===============
-        if (previewMove !== null) {
-            // ===== 仮移動後の駒をもう一度クリックすると確定 =====
+        // ===== クリックしたマスの駒を取得 =====
+        const piece = currentBoard[rowIndex][colIndex];
+
+        // ===== 自分の別の駒をクリックした場合、選択を切り替える =====
+        if (piece && piece.player === myPlayer) {
+            // 現在選択している駒をもう一度クリックした場合
             if (
-                previewMove.to.row === rowIndex &&
-                previewMove.to.col === colIndex
+                selectedSquare?.row === rowIndex &&
+                selectedSquare?.col === colIndex
             ) {
-                confirmPreview(previewMove.promote);
+                clearSquareSelection();
                 return;
             }
 
-            // ===== 仮移動中は他のマスをクリックしても何もしない =====
-            return;
-        }
+            selectSquare(rowIndex, colIndex);
 
-        // ===== 選択中の駒をもう一度クリックすると選択解除 =====
-        if (
-            selectedSquare?.row === rowIndex &&
-            selectedSquare?.col === colIndex
-        ) {
-            setSelectedSquare(null);
-            setMovableSquares([]);
             return;
         }
 
@@ -383,6 +459,41 @@ export default function OnlineBoard({
 
     // 合体！ 
     function handleSquareClick(rowIndex: number, colIndex: number) {
+        // ===== 効き表示モード =====
+        if (isAttackMode) {
+            const piece = currentBoard[rowIndex][colIndex];
+
+            if (!piece) return;
+
+            const isAttackPiece = attackPieces.includes(piece.id);
+
+            if (isAttackPiece) {
+                setAttackPieces((prev) =>
+                    prev.filter((id) => id !== piece.id)
+                );
+            } else {
+                setAttackPieces((prev) => [
+                    ...prev,
+                    piece.id,
+                ]);
+            }
+
+            return;
+        }
+
+        // ===== 仮移動中 =====
+        if (previewMove !== null) {
+            if (
+                previewMove.to.row === rowIndex &&
+                previewMove.to.col === colIndex
+            ) {
+                confirmPreview(previewMove.promote);
+            }
+
+            return;
+        }
+
+
         // ===== 持ち駒選択中 =====
         if (selectedHandPiece) {
             handleHandPieceSquareClick(rowIndex, colIndex);
@@ -408,20 +519,32 @@ export default function OnlineBoard({
         type: CapturedPieceType,
         player: Player
     ) {
+        // ===== 効き表示モード中は持ち駒を選択できない =====
+        if (isAttackMode) return;
+        
+        // ===== 仮移動中は持ち駒を選択できない =====
+        if (previewMove !== null) return;
+
         // ===== 勝敗が決まっていたら選択できない =====
         if (winner) return;
+
+        // ===== 自分の手番ではない場合は選択できない =====
+        if (myPlayer !== turn) return;
 
         // ===== 自分の手番ではない持ち駒は選択できない =====
         if (player !== myPlayer) return;
 
-        // ===== 仮移動中ならキャンセルして通常状態に戻す =====
-        if (previewMove !== null) {
-            cancelPreview();
+        // ===== 選択中の持ち駒をもう一度クリックしたら選択解除 =====
+        if (
+            selectedHandPiece?.type === type &&
+            selectedHandPiece?.player === player
+        ) {
+            setSelectedHandPiece(null);
+            return;
         }
 
         // ===== 盤上の駒の選択を解除 =====
-        setSelectedSquare(null);
-        setMovableSquares([]);
+        clearSquareSelection();
 
         // ===== 持ち駒を選択 =====
         setSelectedHandPiece({
@@ -436,6 +559,16 @@ export default function OnlineBoard({
         colIndex: number
     ) {
         if (!selectedHandPiece) return;
+
+
+        // ===== 自分の駒をクリックした場合 =====
+        const piece = currentBoard[rowIndex][colIndex];
+        if (piece && piece.player === selectedHandPiece.player) {
+            setSelectedHandPiece(null);
+            selectSquare(rowIndex, colIndex);
+
+            return;
+        }
 
         // ===== その場所に持ち駒を打てるか判定 =====
         const canDrop = canDropPiece(
@@ -470,14 +603,39 @@ export default function OnlineBoard({
             hands,
             move
         );
+        
 
         setPreviewMove(move);
         setPreviewBoard(result.board);
         setPreviewHands(result.hands);
+        setCanPromotePreview(false);
 
         // ===== 持ち駒の選択を解除 =====
         setSelectedHandPiece(null);
     }
+
+    // 盤面外クリック処理
+    useEffect(() => {
+        function handleOutsideClick(event: MouseEvent) {
+            const target = event.target as HTMLElement;
+
+            if (
+                !target.closest(".board") &&
+                !target.closest(".hand")
+            ) {
+                if (previewBoard !== null) return;
+
+                clearSquareSelection();
+                setSelectedHandPiece(null);
+            }
+        }
+
+        document.addEventListener("click", handleOutsideClick);
+
+        return () => {
+            document.removeEventListener("click", handleOutsideClick);
+        };
+    }, [previewBoard]);
 
     // ==================================================================================================
 
@@ -490,6 +648,7 @@ export default function OnlineBoard({
         setPreviewHands(null);
         setSelectedSquare(null);
         setMovableSquares([]);
+        setCanPromotePreview(false);
     }
 
     // ===== 仮移動を確定 =====
@@ -533,6 +692,28 @@ export default function OnlineBoard({
                 }`}
             >
 
+                {myPlayer === null && (
+                    isFirstPlayer ? (
+                        <div>
+                            <button onClick={() => selectPlayer("sente")}>
+                                先手
+                            </button>
+
+                            <button onClick={() => selectPlayer("gote")}>
+                                後手
+                            </button>
+                        </div>
+                    ) : (
+                        <p>相手の選択を待っています</p>
+                    )
+                )}
+
+                {myPlayer !== null && (
+                    <p>
+                        {isMyTurn ? "あなたの手番です" : "相手の手番です"}
+                    </p>
+                )}
+
                 <div className="game-area">
 
                     <div className="game-layout">
@@ -572,118 +753,141 @@ export default function OnlineBoard({
                         </div>
                     
 
-                        <div className="board">
-                            {/* ダイアログ */}
-                            {message && (
-                                <div className="board-message">
-                                    {message}
-                                </div>
-                            )}
+                        {/* 盤面 */}
+                        <div className="board-container">
 
-                            {displayBoard.flatMap((row, rowIndex) =>
-                                row.map((piece, colIndex) => {
-                                    const isSelected =
-                                        selectedSquare?.row === rowIndex &&
-                                        selectedSquare?.col === colIndex;
+                            <div className="board">
+                                {/* ダイアログ */}
+                                {message && (
+                                    <div className="board-message">
+                                        {message}
+                                    </div>
+                                )}
 
-                                    const isMovable = movableSquares.some(
-                                        (square) =>
-                                            square.row === rowIndex &&
-                                            square.col === colIndex
-                                    );
+                                    {displayBoard.flatMap((row, rowIndex) =>
+                                        row.map((piece, colIndex) => {
+                                            const isSelected =
+                                                selectedSquare?.row === rowIndex &&
+                                                selectedSquare?.col === colIndex;
 
-                                    return (
-                                        <div
-                                            key={`${rowIndex}-${colIndex}`}
-                                            className={`square ${
-                                                rowIndex < 3 || rowIndex >= 6
-                                                    ? "promotion-zone"
-                                                    : ""
-                                            }`}
-                                            onClick={() =>
-                                                handleSquareClick(rowIndex, colIndex)
-                                            }
-                                        >
-                                            <div
-                                                className={`square-overlay
-                                                    ${isMovable ? "movable" : ""}
-                                                    ${isSelected ? "selected-square-overlay" : ""}
-                                                `}
-                                            />
+                                            const isMovable = movableSquares.some(
+                                                (square) =>
+                                                    square.row === rowIndex &&
+                                                    square.col === colIndex
+                                            );
 
-                                            {piece && (
+                                            const isDrop = dropSquares.some(
+                                                (square) =>
+                                                    square.row === rowIndex &&
+                                                    square.col === colIndex
+                                            );
+
+                                            // ===== 効きを表示している駒か判定 =====
+                                            const isAttack = attackSquares.some(
+                                                (square) =>
+                                                    square.row === rowIndex &&
+                                                    square.col === colIndex
+                                            );
+
+                                            const isAttackPiece =
+                                                piece !== null && attackPieces.includes(piece.id);
+
+                                            return (
                                                 <div
-                                                    className={`
-                                                        piece 
-                                                        ${piece.player} 
-                                                        ${isSelected ? "selected" : ""}`}
+                                                    key={`${rowIndex}-${colIndex}`}
+                                                    className={`square ${
+                                                        rowIndex < 3 || rowIndex >= 6
+                                                            ? "promotion-zone"
+                                                            : ""
+                                                    }`}
+                                                    onClick={() =>
+                                                        handleSquareClick(rowIndex, colIndex)
+                                                    }
                                                 >
-                                                    {piece.promoted
-                                                        ? promotedPieceNames[piece.type]
-                                                        : pieceNames[piece.type]}
+                                                    <div
+                                                        className={`square-overlay
+                                                            ${isMovable || isDrop ? "movable" : ""} 
+                                                            ${isAttack ? "attack" : ""}
+                                                            ${isSelected ? "selected-square-overlay" : ""}
+                                                        `}
+                                                    />
+
+                                                    {piece && (
+                                                        <div
+                                                            className={`
+                                                                piece
+                                                                ${piece.player}
+                                                                ${isSelected ? "selected" : ""}
+                                                                ${isAttackPiece ? "attack-piece" : ""}
+                                                            `}
+                                                        >
+                                                            {piece.promoted
+                                                                ? promotedPieceNames[piece.type]
+                                                                : pieceNames[piece.type]}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            )}
-                                        </div>
-                                    );
-                                })
-                            )}
+                                            );
+                                        })
+                                    )}
 
-                            {previewBoard !== null && selectedSquare && (
-                                <div
-                                    className={`preview-message ${
-                                        selectedSquare.col >= 7
-                                            ? "preview-left"
-                                            : "preview-right"
-                                    } ${
-                                        selectedSquare.row >= 7
-                                            ? "preview-above"
-                                            : selectedSquare.row <= 1
-                                                ? "preview-below"
-                                                : ""
-                                    }`}
-                                    style={{
-                                        left: `${((selectedSquare.col + 0.5) / 9) * 100}%`,
-                                        top: `${((selectedSquare.row + 0.5) / 9) * 100}%`,
-                                    }}
-                                >
-                                    {canPromotePreview && (
-                                        <>
-                                            <button
-                                                onClick={() => {
-                                                    confirmPreview(true);
-                                                }}
-                                            >
-                                                成る
-                                            </button>
+                                {previewBoard !== null && previewMove && (
+                                    <div
+                                        className={`preview-message ${
+                                            previewMove.to.col >= 7
+                                                ? "preview-left"
+                                                : "preview-right"
+                                        } ${
+                                            previewMove.to.row >= 7
+                                                ? "preview-above"
+                                                : previewMove.to.row <= 1
+                                                    ? "preview-below"
+                                                    : ""
+                                        }`}
+                                        style={{
+                                            left: `${((previewMove.to.col + 0.5) / 9) * 100}%`,
+                                            top: `${((previewMove.to.row + 0.5) / 9) * 100}%`,
+                                        }}
+                                    >
+                                        {canPromotePreview && (
+                                            <>
+                                                <button
+                                                    onClick={() => {
+                                                        confirmPreview(true);
+                                                    }}
+                                                >
+                                                    成る
+                                                </button>
 
+                                                <button
+                                                    onClick={() => {
+                                                        confirmPreview(false);
+                                                    }}
+                                                >
+                                                    成らない
+                                                </button>
+                                            </>
+                                        )}
+
+                                        {!canPromotePreview && (
                                             <button
                                                 onClick={() => {
                                                     confirmPreview(false);
                                                 }}
                                             >
-                                                成らない
+                                                確定
                                             </button>
-                                        </>
-                                    )}
+                                        )}
 
-                                    {!canPromotePreview && (
-                                        <button
-                                            onClick={() => {
-                                                confirmPreview(false);
-                                            }}
-                                        >
-                                            確定
+                                        <button onClick={cancelPreview}>
+                                            キャンセル
                                         </button>
-                                    )}
-
-                                    <button
-                                        onClick={cancelPreview}
-                                    >
-                                        キャンセル
-                                    </button>
-                                </div>
-                            )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
+
+
 
                         <div className="hand bottom-hand">
                             <div className="hand-pieces">
@@ -719,6 +923,34 @@ export default function OnlineBoard({
                             </div>
                         </div>
                     
+                    </div>
+
+                    <div className="board-controls">
+                        <div className="mode-switch">
+                            <div
+                                className={`mode-switch-slider ${
+                                    isAttackMode ? "attack" : "normal"
+                                }`}
+                            />
+
+                            <button
+                                className={!isAttackMode ? "active" : ""}
+                                onClick={() => {
+                                    setIsAttackMode(false);
+                                }}
+                            >
+                                通常モード
+                            </button>
+
+                            <button
+                                className={isAttackMode ? "active" : ""}
+                                onClick={() => {
+                                    setIsAttackMode(true);
+                                }}
+                            >
+                                効き表示モード
+                            </button>
+                        </div>
                     </div>
 
                 </div>

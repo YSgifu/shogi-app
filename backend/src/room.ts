@@ -22,6 +22,8 @@ export class Room {
 
     private turn: Player = "sente";
 
+    private selectedPlayer: Player | null = null;
+
     async fetch(request: Request): Promise<Response> {
         if (request.headers.get("Upgrade") !== "websocket") {
             return new Response("WebSocket connection required", {
@@ -46,6 +48,8 @@ export class Room {
 
         server.accept();
 
+        const isFirstPlayer = this.clients.length === 0;
+
         this.clients.push({
             socket: server,
             player,
@@ -53,13 +57,73 @@ export class Room {
 
         server.send(
             JSON.stringify({
-                type: "player-assigned",
-                player,
+                type: "player-position",
+                isFirstPlayer,
             })
         );
 
+
         server.addEventListener("message", (event) => {
-            const move: Move = JSON.parse(event.data);
+            const message = JSON.parse(event.data);
+
+            if (message.type === "player-choice") {
+                // ===== 1人目の選択を保存 =====
+                this.selectedPlayer = message.player;
+
+                console.log(
+                    "先後保存:",
+                    this.selectedPlayer
+                );
+
+                // ===== 2人目がまだいない場合はここで終了 =====
+                if (this.clients.length < 2) {
+                    return;
+                }
+
+                // ===== 2人目は反対の手番 =====
+                const opponentPlayer: Player =
+                    this.selectedPlayer === "sente"
+                        ? "gote"
+                        : "sente";
+
+                console.log(
+                    "相手の手番:",
+                    opponentPlayer
+                );
+
+                // ===== Room内部の先後を更新 =====
+                this.clients[0].player = this.selectedPlayer!;
+                this.clients[1].player = opponentPlayer;
+
+                console.log(
+                    "Room内の先後:",
+                    this.clients.map((client) => client.player)
+                );
+
+                // ===== 先後を両者へ通知 =====
+                const firstClient = this.clients[0];
+                const secondClient = this.clients[1];
+
+                firstClient.socket.send(
+                    JSON.stringify({
+                        type: "player-assigned",
+                        player: this.selectedPlayer,
+                    })
+                );
+
+                secondClient.socket.send(
+                    JSON.stringify({
+                        type: "player-assigned",
+                        player: opponentPlayer,
+                    })
+                );
+
+
+                return;
+            }
+
+            // ===== 既存のMove処理 =====
+            const move = message as Move;
 
             const client = this.clients.find(
                 (client) => client.socket === server
@@ -76,7 +140,7 @@ export class Room {
                     ? "gote"
                     : "sente";
 
-            const message = JSON.stringify({
+            const moveMessage = JSON.stringify({
                 type: "move",
                 move,
                 turn: this.turn,
@@ -84,7 +148,7 @@ export class Room {
 
             for (const client of this.clients) {
                 if (client.socket.readyState === WebSocket.OPEN) {
-                    client.socket.send(message);
+                    client.socket.send(moveMessage);
                 }
             }
         });

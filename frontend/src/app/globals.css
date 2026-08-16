@@ -306,6 +306,13 @@ a {
     transform: rotate(180deg) translateY(-4px) scale(1.04);
 }
 
+.hand-piece.selected {
+    transform: translateY(-4px) scale(1.04);
+    box-shadow:
+        0 6px 11px rgba(0, 0, 0, 0.24),
+        0 0 0 2px rgba(82, 126, 160, 0.4);
+}
+
 .attack-piece {
     color: #c94a4a;
 }
@@ -1028,7 +1035,7 @@ a {
     Mobile
 ========================================================================================== */
 
-@media (max-width: 600px) {
+@media (max-width: 960px) {
     .shogi-app {
         width: 100%;
         padding: 12px 0px 20px;

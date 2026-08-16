@@ -147,7 +147,10 @@ export class Room {
             });
 
             for (const client of this.clients) {
-                if (client.socket.readyState === WebSocket.OPEN) {
+                if (
+                    client.socket !== server &&
+                    client.socket.readyState === WebSocket.OPEN
+                ) {
                     client.socket.send(moveMessage);
                 }
             }

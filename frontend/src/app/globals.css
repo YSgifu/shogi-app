@@ -281,7 +281,7 @@ a {
         box-shadow 0.15s ease;
 }
 
-.piece.gote {
+.piece.rotate-piece {
     transform: rotate(180deg);
 }
 
@@ -290,7 +290,7 @@ a {
     box-shadow: 0 5px 9px rgba(0, 0, 0, 0.18);
 }
 
-.piece.gote:hover {
+.piece.rotate-piece:hover {
     transform: rotate(180deg) translateY(-2px);
 }
 
@@ -302,7 +302,7 @@ a {
         0 0 0 2px rgba(82, 126, 160, 0.4);
 }
 
-.piece.gote.selected {
+.piece.rotate-piece.selected {
     transform: rotate(180deg) translateY(-4px) scale(1.04);
 }
 

@@ -62,7 +62,12 @@ export default function OnlineBoard({
     // 仮移動後の盤面
     const [previewBoard, setPreviewBoard] = useState<Board | null>(null);
     // 仮移動後のプレイヤーに見せる盤面
-    const displayBoard = previewBoard ?? currentBoard;
+    const displayBoard =
+        myPlayer === "gote"
+            ? [...(previewBoard ?? currentBoard)]
+                .reverse()
+                .map((row) => [...row].reverse())
+            : previewBoard ?? currentBoard;
     // 仮移動モード中の持ち駒
     const [previewHands, setPreviewHands] =
         useState<Hands | null>(null);
@@ -86,9 +91,9 @@ export default function OnlineBoard({
     const isMyTurn = myPlayer !== null && myPlayer === turn;
     // 仮の「自分が1人目か」を追加
     const [isFirstPlayer, setIsFirstPlayer] = useState(false);
-    const previewPosition = previewMove?.to ?? null;
     const [isAttackMode, setIsAttackMode] = useState(false);
     const [attackPieces, setAttackPieces] = useState<number[]>([]);
+    
 
     const boardRef = useRef<Board>(currentBoard);
     const handsRef = useRef<Hands>(hands);
@@ -764,126 +769,161 @@ export default function OnlineBoard({
                                     </div>
                                 )}
 
-                                    {displayBoard.flatMap((row, rowIndex) =>
-                                        row.map((piece, colIndex) => {
-                                            const isSelected =
-                                                selectedSquare?.row === rowIndex &&
-                                                selectedSquare?.col === colIndex;
+                                {displayBoard.flatMap((row, rowIndex) =>
+                                    row.map((piece, colIndex) => {
+                                        const actualRow =
+                                            myPlayer === "gote"
+                                                ? 8 - rowIndex
+                                                : rowIndex;
 
-                                            const isMovable = movableSquares.some(
-                                                (square) =>
-                                                    square.row === rowIndex &&
-                                                    square.col === colIndex
-                                            );
+                                        const actualCol =
+                                            myPlayer === "gote"
+                                                ? 8 - colIndex
+                                                : colIndex;
 
-                                            const isDrop = dropSquares.some(
-                                                (square) =>
-                                                    square.row === rowIndex &&
-                                                    square.col === colIndex
-                                            );
+                                        const isSelected =
+                                            selectedSquare?.row === actualRow &&
+                                            selectedSquare?.col === actualCol;
 
-                                            // ===== 効きを表示している駒か判定 =====
-                                            const isAttack = attackSquares.some(
-                                                (square) =>
-                                                    square.row === rowIndex &&
-                                                    square.col === colIndex
-                                            );
+                                        const isMovable = movableSquares.some(
+                                            (square) =>
+                                                square.row === actualRow &&
+                                                square.col === actualCol
+                                        );
 
-                                            const isAttackPiece =
-                                                piece !== null && attackPieces.includes(piece.id);
+                                        const isDrop = dropSquares.some(
+                                            (square) =>
+                                                square.row === actualRow &&
+                                                square.col === actualCol
+                                        );
 
-                                            return (
+                                        // ===== 効きを表示している駒か判定 =====
+                                        const isAttack = attackSquares.some(
+                                            (square) =>
+                                                square.row === actualRow &&
+                                                square.col === actualCol
+                                        );
+
+                                        const isAttackPiece =
+                                            piece !== null &&
+                                            attackPieces.includes(piece.id);
+
+                                        // ===== 自分から見て相手の駒なら180度回転 =====
+                                        const shouldRotatePiece =
+                                            piece !== null &&
+                                            piece.player !== myPlayer;
+
+                                        return (
+                                            <div
+                                                key={`${rowIndex}-${colIndex}`}
+                                                className={`square ${
+                                                    actualRow < 3 || actualRow >= 6
+                                                        ? "promotion-zone"
+                                                        : ""
+                                                }`}
+                                                onClick={() =>
+                                                    handleSquareClick(
+                                                        actualRow,
+                                                        actualCol
+                                                    )
+                                                }
+                                            >
                                                 <div
-                                                    key={`${rowIndex}-${colIndex}`}
-                                                    className={`square ${
-                                                        rowIndex < 3 || rowIndex >= 6
-                                                            ? "promotion-zone"
-                                                            : ""
-                                                    }`}
-                                                    onClick={() =>
-                                                        handleSquareClick(rowIndex, colIndex)
-                                                    }
-                                                >
-                                                    <div
-                                                        className={`square-overlay
-                                                            ${isMovable || isDrop ? "movable" : ""} 
-                                                            ${isAttack ? "attack" : ""}
-                                                            ${isSelected ? "selected-square-overlay" : ""}
-                                                        `}
-                                                    />
+                                                    className={`square-overlay
+                                                        ${isMovable || isDrop ? "movable" : ""}
+                                                        ${isAttack ? "attack" : ""}
+                                                        ${isSelected ? "selected-square-overlay" : ""}
+                                                    `}
+                                                />
 
-                                                    {piece && (
-                                                        <div
-                                                            className={`
-                                                                piece
-                                                                ${piece.player}
-                                                                ${isSelected ? "selected" : ""}
-                                                                ${isAttackPiece ? "attack-piece" : ""}
-                                                            `}
-                                                        >
-                                                            {piece.promoted
-                                                                ? promotedPieceNames[piece.type]
-                                                                : pieceNames[piece.type]}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })
-                                    )}
+                                                {piece && (
+                                                    <div
+                                                        className={`
+                                                            piece
+                                                            ${piece.player}
+                                                            ${shouldRotatePiece ? "rotate-piece" : ""}
+                                                            ${isSelected ? "selected" : ""}
+                                                            ${isAttackPiece ? "attack-piece" : ""}
+                                                        `}
+                                                    >
+                                                        {piece.promoted
+                                                            ? promotedPieceNames[piece.type]
+                                                            : pieceNames[piece.type]}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })
+                                )}
 
                                 {previewBoard !== null && previewMove && (
-                                    <div
-                                        className={`preview-message ${
-                                            previewMove.to.col >= 7
-                                                ? "preview-left"
-                                                : "preview-right"
-                                        } ${
-                                            previewMove.to.row >= 7
-                                                ? "preview-above"
-                                                : previewMove.to.row <= 1
-                                                    ? "preview-below"
-                                                    : ""
-                                        }`}
-                                        style={{
-                                            left: `${((previewMove.to.col + 0.5) / 9) * 100}%`,
-                                            top: `${((previewMove.to.row + 0.5) / 9) * 100}%`,
-                                        }}
-                                    >
-                                        {canPromotePreview && (
-                                            <>
-                                                <button
-                                                    onClick={() => {
-                                                        confirmPreview(true);
-                                                    }}
-                                                >
-                                                    成る
-                                                </button>
+                                    (() => {
+                                        const previewDisplayRow =
+                                            myPlayer === "gote"
+                                                ? 8 - previewMove.to.row
+                                                : previewMove.to.row;
 
-                                                <button
-                                                    onClick={() => {
-                                                        confirmPreview(false);
-                                                    }}
-                                                >
-                                                    成らない
-                                                </button>
-                                            </>
-                                        )}
+                                        const previewDisplayCol =
+                                            myPlayer === "gote"
+                                                ? 8 - previewMove.to.col
+                                                : previewMove.to.col;
 
-                                        {!canPromotePreview && (
-                                            <button
-                                                onClick={() => {
-                                                    confirmPreview(false);
+                                        return (
+                                            <div
+                                                className={`preview-message ${
+                                                    previewDisplayCol >= 7
+                                                        ? "preview-left"
+                                                        : "preview-right"
+                                                } ${
+                                                    previewDisplayRow >= 7
+                                                        ? "preview-above"
+                                                        : previewDisplayRow <= 1
+                                                            ? "preview-below"
+                                                            : ""
+                                                }`}
+                                                style={{
+                                                    left: `${((previewDisplayCol + 0.5) / 9) * 100}%`,
+                                                    top: `${((previewDisplayRow + 0.5) / 9) * 100}%`,
                                                 }}
                                             >
-                                                確定
-                                            </button>
-                                        )}
+                                                {canPromotePreview && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => {
+                                                                confirmPreview(true);
+                                                            }}
+                                                        >
+                                                            成る
+                                                        </button>
 
-                                        <button onClick={cancelPreview}>
-                                            キャンセル
-                                        </button>
-                                    </div>
+                                                        <button
+                                                            onClick={() => {
+                                                                confirmPreview(false);
+                                                            }}
+                                                        >
+                                                            成らない
+                                                        </button>
+                                                    </>
+                                                )}
+
+                                                {!canPromotePreview && (
+                                                    <button
+                                                        onClick={() => {
+                                                            confirmPreview(false);
+                                                        }}
+                                                    >
+                                                        確定
+                                                    </button>
+                                                )}
+
+                                                <button onClick={cancelPreview}>
+                                                    キャンセル
+                                                </button>
+                                            </div>
+                                        );
+                                    })()
                                 )}
+
                             </div>
                         </div>
 

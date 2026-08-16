@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Board, Hands, Player, CapturedPieceType, Move, PieceType } from "@/types/shogi";
+import type { Board, Hands, Player, CapturedPieceType, Move_before, PieceType } from "@/types/shogi";
 import { pieceNames, promotedPieceNames, createPiece } from "@/lib/piece";
 import { getMovableSquares, canPromote, canDropPiece, getAttackSquares } from "@/lib/moves";
 import { isInCheck, isLegalMove, isCheckmate } from "@/lib/check";
@@ -23,7 +23,7 @@ export default function Board({ board }: BoardProps) {
         gote: {FU: 0, KY: 0, KE: 0, GI: 0, KI: 0, KA: 0, HI: 0,},
     });
     const [previousHands, setPreviousHands] = useState<Hands>(hands);
-    const [moveHistory, setMoveHistory] = useState<Move[]>([]);
+    const [moveHistory, setMoveHistory] = useState<Move_before[]>([]);
     const [previewCapturedPieceType, setPreviewCapturedPieceType] = useState<PieceType | null>(null);
 
     // ===== 選択状態 =====
@@ -239,7 +239,7 @@ export default function Board({ board }: BoardProps) {
             }
 
             // 持ち駒を打つ
-            const move: Move = {
+            const move: Move_before = {
                 player: selectedHandPiece.player,
                 from: null,
                 to: {
@@ -340,7 +340,7 @@ export default function Board({ board }: BoardProps) {
                 rowIndex
             );
 
-            const move: Move = {
+            const move: Move_before = {
                 player: movingPiece.player,
                 from: selectedSquare,
                 to: {
@@ -523,7 +523,7 @@ export default function Board({ board }: BoardProps) {
     const confirmMove = (promote: boolean = false) => {
         if (!previewMove) return;
 
-        const move: Move = {
+        const move: Move_before = {
             player: currentPlayer,
             from: previewMove.from,
             to: previewMove.to,
@@ -583,7 +583,7 @@ export default function Board({ board }: BoardProps) {
     const startPreview = (
         newBoard: Board,
         newHands: Hands,
-        move: Move,
+        move: Move_before,
         selectedPosition: { row: number; col: number },
         canPromoteMove: boolean = false
     ) => {
@@ -601,7 +601,7 @@ export default function Board({ board }: BoardProps) {
         setIsPreviewing(true);
     };
 
-    const addMoveToHistory = (move: Move) => {
+    const addMoveToHistory = (move: Move_before) => {
         setMoveHistory((prev) => [
             ...prev,
             move,
@@ -611,7 +611,7 @@ export default function Board({ board }: BoardProps) {
     function applyMove(
         board: Board,
         hands: Hands,
-        move: Move
+        move: Move_before
     ) {
         const newBoard = board.map((row) =>
             row.map((piece) =>
@@ -674,7 +674,7 @@ export default function Board({ board }: BoardProps) {
         };
     }
 
-    function rebuildPosition(history: Move[]) {
+    function rebuildPosition(history: Move_before[]) {
         let rebuiltBoard = board.map((row) =>
             row.map((piece) =>
                 piece ? { ...piece } : null

@@ -6,6 +6,7 @@ import { pieceNames, promotedPieceNames, createPiece } from "@/lib/piece";
 import { getMovableSquares, canPromote, canDropPiece, getAttackSquares } from "@/lib/moves";
 import { isInCheck, isLegalMove, isCheckmate } from "@/lib/check";
 
+
 type Move = {
     type: "move";
     player: Player;
@@ -233,6 +234,11 @@ export default function OnlineBoard({
 
             if (message.type === "player-assigned") {
                 setMyPlayer(message.player);
+                return;
+            }
+
+            if (message.type === "turn-update") {
+                setTurn(message.turn);
                 return;
             }
 
@@ -644,6 +650,26 @@ export default function OnlineBoard({
 
     // ==================================================================================================
 
+    // ===== 指定したプレイヤーの全駒の効きを表示 =====
+    function showAllAttackPieces(player: Player) {
+        const pieceIds = currentBoard
+            .flatMap((row) => row)
+            .filter(
+                (piece): piece is NonNullable<typeof piece> =>
+                    piece !== null && piece.player === player
+            )
+            .map((piece) => piece.id);
+
+        setAttackPieces((prev) => [
+            ...new Set([...prev, ...pieceIds]),
+        ]);
+    }
+
+    // ===== 効き表示をすべて解除 =====
+    function clearAttackPieces() {
+        setAttackPieces([]);
+    }
+
     // ==================== ダイアログボタン用関数群 ====================
 
     // ===== 仮移動をキャンセルする処理 =====
@@ -841,7 +867,7 @@ export default function OnlineBoard({
                                                         className={`
                                                             piece
                                                             ${piece.player}
-                                                            ${shouldRotatePiece ? "rotate-piece" : ""}
+                                                            ${shouldRotatePiece ? "rotate-piece" : "my-piece"}
                                                             ${isSelected ? "selected" : ""}
                                                             ${isAttackPiece ? "attack-piece" : ""}
                                                         `}
@@ -966,6 +992,7 @@ export default function OnlineBoard({
                     </div>
 
                     <div className="board-controls">
+
                         <div className="mode-switch">
                             <div
                                 className={`mode-switch-slider ${
@@ -991,6 +1018,47 @@ export default function OnlineBoard({
                                 効き表示モード
                             </button>
                         </div>
+
+                        <div className="attack-controls">
+                            <div className="attack-controls-title">
+                                一括表示
+                            </div>
+
+                            <div className="attack-controls-buttons">
+                                <button
+                                    className="attack-all-my"
+                                    onClick={() => {
+                                        if (myPlayer) {
+                                            showAllAttackPieces(myPlayer);
+                                        }
+                                    }}
+                                >
+                                    自分
+                                </button>
+
+                                <button
+                                    className="attack-all-opponent"
+                                    onClick={() => {
+                                        if (myPlayer) {
+                                            const opponent: Player =
+                                                myPlayer === "sente" ? "gote" : "sente";
+
+                                            showAllAttackPieces(opponent);
+                                        }
+                                    }}
+                                >
+                                    相手
+                                </button>
+
+                                <button
+                                    className="attack-clear"
+                                    onClick={clearAttackPieces}
+                                >
+                                    消す
+                                </button>
+                            </div>
+                        </div>
+
                     </div>
 
                 </div>

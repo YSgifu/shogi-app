@@ -30,11 +30,27 @@ export type Hands = {
     gote: CapturedPieces;
 };
 
-export type Move = {
+export type Move_before = {
     player: Player;
     from: { row: number; col: number;} | null;
     to: { row: number; col: number; };
     pieceType: PieceType;
     promoted: boolean;
     capturedPieceType: PieceType | null;
+};
+
+export type Move = {
+    type: "move";
+    player: Player;
+    from: {
+        row: number;
+        col: number;
+    } | null;
+    to: {
+        row: number;
+        col: number;
+    };
+    promote: boolean;
+    piece?: PieceType;
+    capturedPieceType?: CapturedPieceType;
 };

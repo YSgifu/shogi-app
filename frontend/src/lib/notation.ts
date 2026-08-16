@@ -1,4 +1,4 @@
-import type { Move } from "@/types/shogi";
+import type { Move_before } from "@/types/shogi";
 import { pieceNames } from "@/lib/piece";
 
 const files = ["９", "８", "７", "６", "５", "４", "３", "２", "１"];
@@ -19,7 +19,7 @@ export const formatSquare = (row: number, col: number) => {
     return `${files[col]}${ranks[row]}`;
 };
 
-export const formatMove = (move: Move) => {
+export const formatMove = (move: Move_before) => {
     const playerMark = move.player === "sente" ? "▲" : "△";
     const square = formatSquare(move.to.row, move.to.col);
     const pieceName = pieceNames[move.pieceType];

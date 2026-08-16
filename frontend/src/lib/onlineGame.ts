@@ -1,7 +1,6 @@
 import type {
     Board,
     Hands,
-    Move,
     CapturedPieceType,
 } from "@/types/shogi";
 

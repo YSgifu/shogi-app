@@ -154,6 +154,14 @@ export class Room {
                     client.socket.send(moveMessage);
                 }
             }
+
+            // ===== 自分にはターン変更だけ通知 =====
+            server.send(
+                JSON.stringify({
+                    type: "turn-update",
+                    turn: this.turn,
+                })
+            );
         });
 
         server.addEventListener("close", () => {

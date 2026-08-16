@@ -279,10 +279,22 @@ a {
     transition:
         transform 0.15s ease,
         box-shadow 0.15s ease;
+
+    filter:
+        drop-shadow(0 2px 0 rgba(47, 43, 39, 1))
+        drop-shadow(2px 0 0 rgba(47, 43, 39, 1))
+        drop-shadow(-2px 0 0 rgba(47, 43, 39, 1))
+        drop-shadow(0 -2px 0 rgba(47, 43, 39, 1));
 }
+
 
 .piece.rotate-piece {
     transform: rotate(180deg);
+}
+
+.piece.my-piece {
+    outline: 5px solid #5291cd;
+    outline-offset: 2px;
 }
 
 .piece:hover {

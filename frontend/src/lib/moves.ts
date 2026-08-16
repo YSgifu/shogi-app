@@ -805,54 +805,54 @@ function getGoldAttackSquares(
     );
 }
 
-// export const applyMove = (board: Board, hands: Hands, move: Move): {
-//     board: Board;
-//     hands: Hands;
-// } => {
-//     const nextBoard = board.map((row) =>
-//         row.map((piece) =>
-//             piece ? { ...piece } : null
-//         )
-//     );
+export const applyMove = (board: Board, hands: Hands, move: Move): {
+    board: Board;
+    hands: Hands;
+} => {
+    const nextBoard = board.map((row) =>
+        row.map((piece) =>
+            piece ? { ...piece } : null
+        )
+    );
 
-//     const nextHands: Hands = {
-//         sente: { ...hands.sente },
-//         gote: { ...hands.gote },
-//     };
+    const nextHands: Hands = {
+        sente: { ...hands.sente },
+        gote: { ...hands.gote },
+    };
 
-//     if (move.from) {
-//         const piece = nextBoard[move.from.row][move.from.col];
+    if (move.from) {
+        const piece = nextBoard[move.from.row][move.from.col];
 
-//         nextBoard[move.from.row][move.from.col] = null;
+        nextBoard[move.from.row][move.from.col] = null;
 
-//         if (piece) {
-//                 // ===== 駒を取った場合 =====
-//                 if (
-//                     move.capturedPieceType 
-//                 ) {
-//                     nextHands[move.player][move.capturedPieceType] += 1;
-//                 }
+        if (piece) {
+                // ===== 駒を取った場合 =====
+                if (
+                    move.capturedPieceType 
+                ) {
+                    nextHands[move.player][move.capturedPieceType] += 1;
+                }
 
 
-//             if (move.promote) {
-//                 piece.promoted = true;
-//             }
+            if (move.promote) {
+                piece.promoted = true;
+            }
 
-//             nextBoard[move.to.row][move.to.col] = piece;
-//         }
-//     }
+            nextBoard[move.to.row][move.to.col] = piece;
+        }
+    }
 
-//     // ===== 持ち駒を打つ =====
-//     if (move.piece) {
-//         nextBoard[move.to.row][move.to.col] = createPiece(move.piece, move.player);
+    // ===== 持ち駒を打つ =====
+    if (move.piece) {
+        nextBoard[move.to.row][move.to.col] = createPiece(move.piece, move.player);
 
-//         nextHands[move.player][
-//             move.piece as CapturedPieceType
-//         ] -= 1;
-//     }
+        nextHands[move.player][
+            move.piece as CapturedPieceType
+        ] -= 1;
+    }
 
-//     return {
-//         board: nextBoard,
-//         hands: nextHands,
-//     };
-// };
+    return {
+        board: nextBoard,
+        hands: nextHands,
+    };
+};

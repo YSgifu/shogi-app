@@ -88,6 +88,11 @@ export function useGameSocket({
                 return;
             }
 
+            if (message.type === "turn-update") {
+                setTurn(message.turn);
+                return;
+            }
+
             // ===== Move受信 =====
             if (message.type === "move") {
                 console.log(

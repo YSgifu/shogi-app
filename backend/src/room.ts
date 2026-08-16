@@ -25,6 +25,11 @@ export class Room {
     private selectedPlayer: Player | null = null;
 
     async fetch(request: Request): Promise<Response> {
+        // ===== 切断済みのクライアントを削除 =====
+        this.clients = this.clients.filter(
+            (client) => client.socket.readyState === WebSocket.OPEN
+        );
+
         if (request.headers.get("Upgrade") !== "websocket") {
             return new Response("WebSocket connection required", {
                 status: 426,

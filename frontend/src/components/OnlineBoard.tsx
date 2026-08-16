@@ -1,27 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Board, Hands, Player, CapturedPieceType, PieceType } from "@/types/shogi";
+import type { Board, Hands, Player, CapturedPieceType, PieceType, Move } from "@/types/shogi";
 import { pieceNames, promotedPieceNames, createPiece } from "@/lib/piece";
-import { getMovableSquares, canPromote, canDropPiece, getAttackSquares } from "@/lib/moves";
+import { getMovableSquares, canPromote, canDropPiece, getAttackSquares, applyMove } from "@/lib/moves";
 import { isInCheck, isLegalMove, isCheckmate } from "@/lib/check";
 
-
-type Move = {
-    type: "move";
-    player: Player;
-    from: {
-        row: number;
-        col: number;
-    } | null;
-    to: {
-        row: number;
-        col: number;
-    };
-    promote: boolean;
-    piece?: PieceType;
-    capturedPieceType?: CapturedPieceType;
-};
 
 export default function OnlineBoard({
     board,
@@ -146,57 +130,7 @@ export default function OnlineBoard({
 
     // ==================================================================================================
 
-    const applyMove = (board: Board, hands: Hands, move: Move): {
-        board: Board;
-        hands: Hands;
-    } => {
-        const nextBoard = board.map((row) =>
-            row.map((piece) =>
-                piece ? { ...piece } : null
-            )
-        );
 
-        const nextHands: Hands = {
-            sente: { ...hands.sente },
-            gote: { ...hands.gote },
-        };
-
-        if (move.from) {
-            const piece = nextBoard[move.from.row][move.from.col];
-
-            nextBoard[move.from.row][move.from.col] = null;
-
-            if (piece) {
-                    // ===== 駒を取った場合 =====
-                    if (
-                        move.capturedPieceType 
-                    ) {
-                        nextHands[move.player][move.capturedPieceType] += 1;
-                    }
-
-
-                if (move.promote) {
-                    piece.promoted = true;
-                }
-
-                nextBoard[move.to.row][move.to.col] = piece;
-            }
-        }
-
-        // ===== 持ち駒を打つ =====
-        if (move.piece) {
-            nextBoard[move.to.row][move.to.col] = createPiece(move.piece, move.player);
-
-            nextHands[move.player][
-                move.piece as CapturedPieceType
-            ] -= 1;
-        }
-
-        return {
-            board: nextBoard,
-            hands: nextHands,
-        };
-    };
 
     useEffect(() => {
         boardRef.current = currentBoard;
@@ -228,6 +162,11 @@ export default function OnlineBoard({
             const message = JSON.parse(event.data);
 
             if (message.type === "player-position") {
+                console.log(
+                    "player-position受信:",
+                    message.isFirstPlayer
+                );
+
                 setIsFirstPlayer(message.isFirstPlayer);
                 return;
             }
@@ -243,14 +182,12 @@ export default function OnlineBoard({
             }
 
             if (message.type === "move") {
-                console.log("Move受信前のhands:", handsRef.current);
                 const result = applyMove(
                     boardRef.current,
                     handsRef.current,
                     message.move
                 );
 
-                console.log("Move適用後のhands:", result.hands);
 
                 setCurrentBoard(result.board);
                 setHands(result.hands);

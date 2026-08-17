@@ -10,7 +10,15 @@
         "class_name": "Room"
       }
     ]
+  },
+
+  "exports": {
+    "Room": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
   }
+  
   // "compatibility_flags": [
   //   "nodejs_compat"
   // ],

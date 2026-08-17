@@ -164,10 +164,15 @@ export default function OnlineBoard({
 
     // ===== WebSocket接続・サーバーからのMove受信処理、自分の盤面に反映 =====
     useEffect(() => {
-        const socket = new WebSocket(
-            `ws://127.0.0.1:8787/api/rooms/${roomId}/ws`
-        );
+        const wsUrl =
+            process.env.NODE_ENV === "development"
+                ? "ws://127.0.0.1:8787"
+                : "wss://backend.asahi-dev.workers.dev";
 
+        const socket = new WebSocket(
+            `${wsUrl}/api/rooms/${roomId}/ws`
+        );
+        
         socketRef.current = socket;
 
         socket.onopen = () => {

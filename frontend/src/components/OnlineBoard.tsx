@@ -92,6 +92,7 @@ export default function OnlineBoard({
     const boardRef = useRef<Board>(currentBoard);
     const handsRef = useRef<Hands>(hands);
     const myPlayerRef = useRef<Player | null>(myPlayer);
+    const moveSoundRef = useRef<HTMLAudioElement | null>(null);
 
     const dropSquares =
         selectedHandPiece
@@ -158,21 +159,23 @@ export default function OnlineBoard({
         myPlayerRef.current = myPlayer;
     }, [myPlayer]);
 
+    useEffect(() => {
+        moveSoundRef.current =
+            new Audio("/sounds/japanese-chess-piece1.mp3");
+    }, []);
+
     
 
     // ==================================================================================================
 
     // ===== WebSocket接続・サーバーからのMove受信処理、自分の盤面に反映 =====
     useEffect(() => {
-        const wsUrl =
-            process.env.NODE_ENV === "development"
-                ? "ws://127.0.0.1:8787"
-                : "wss://backend.asahi-dev.workers.dev";
+        const wsUrl = "wss://backend.asahi-dev.workers.dev";
 
         const socket = new WebSocket(
             `${wsUrl}/api/rooms/${roomId}/ws`
         );
-        
+
         socketRef.current = socket;
 
         socket.onopen = () => {
@@ -219,6 +222,12 @@ export default function OnlineBoard({
                     handsRef.current,
                     message.move
                 );
+
+                const sound = moveSoundRef.current;
+                if (sound) {
+                    sound.currentTime = 0;
+                    sound.play();
+                }
 
                 const currentMyPlayer = myPlayerRef.current;
 
@@ -298,6 +307,14 @@ export default function OnlineBoard({
 
         setCurrentBoard(result.board);
         setHands(result.hands);
+
+        // 🔊 駒音
+        const sound = moveSoundRef.current;
+
+        if (sound) {
+            sound.currentTime = 0;
+            sound.play();
+        }
 
         socketRef.current?.send(JSON.stringify(move));
 

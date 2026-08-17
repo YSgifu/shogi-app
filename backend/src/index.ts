@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 export { Room } from "./room";
+import { cors } from "hono/cors";
 
 type Env = {
     Bindings: {
@@ -8,6 +9,16 @@ type Env = {
 };
 
 const app = new Hono<Env>();
+
+app.use(
+    "*",
+    cors({
+        origin: [
+            "http://localhost:3000",
+            "https://frontend.asahi-dev.workers.dev",
+        ],
+    })
+);
 
 // ルーム作成
 app.post("/api/rooms", (c) => {

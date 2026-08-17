@@ -148,3 +148,208 @@ a.secondary {
   padding: 0.1em 0.4em;
   border-radius: 6px;
 }
+
+/* ================================================================== */
+
+.container {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 32px 16px;
+    background:
+        radial-gradient(circle at top, #f5ead8 0%, transparent 45%),
+        #eee8dc;
+}
+
+.card {
+    width: 100%;
+    max-width: 460px;
+    padding: 44px 40px;
+    background: rgba(255, 253, 248, 0.96);
+    border: 1px solid rgba(80, 60, 40, 0.12);
+    border-radius: 20px;
+    box-shadow:
+        0 20px 50px rgba(60, 45, 30, 0.12),
+        0 4px 12px rgba(60, 45, 30, 0.06);
+}
+
+.title {
+    margin: 0;
+    text-align: center;
+    font-size: 42px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    color: #2f2923;
+}
+
+.description {
+    margin: 10px 0 34px;
+    text-align: center;
+    color: #7b7064;
+    font-size: 14px;
+}
+
+.divider {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 32px 0 24px;
+    color: #8a7d70;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.divider::before,
+.divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: #ddd3c6;
+}
+
+.section {
+    margin-top: 26px;
+}
+
+.section h2 {
+    margin: 0 0 14px;
+    color: #3b332c;
+    font-size: 17px;
+    font-weight: 700;
+}
+
+.soloButton,
+.primaryButton,
+.secondaryButton,
+.joinButton {
+    width: 100%;
+    border: none;
+    border-radius: 10px;
+    padding: 13px 16px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease,
+        background 0.15s ease;
+}
+
+.soloButton {
+    background: #3f3a34;
+    color: white;
+}
+
+.primaryButton {
+    background: #8b5e3c;
+    color: white;
+    box-shadow: 0 5px 12px rgba(139, 94, 60, 0.2);
+}
+
+.secondaryButton {
+    margin-top: 14px;
+    background: #e8dfd3;
+    color: #4d4035;
+}
+
+.joinButton {
+    width: 92px;
+    flex-shrink: 0;
+    background: #5d765f;
+    color: white;
+}
+
+.soloButton:hover,
+.primaryButton:hover,
+.secondaryButton:hover,
+.joinButton:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 7px 16px rgba(60, 45, 30, 0.14);
+}
+
+.soloButton:active,
+.primaryButton:active,
+.secondaryButton:active,
+.joinButton:not(:disabled):active {
+    transform: translateY(0);
+}
+
+.joinButton:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.createdRoom {
+    margin-top: 16px;
+    padding: 18px;
+    border-radius: 12px;
+    background: #f4eee5;
+    border: 1px solid #e3d8c9;
+    text-align: center;
+}
+
+.roomLabel {
+    margin: 0 0 7px;
+    color: #7c7063;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.roomId {
+    color: #302a24;
+    font-family: monospace;
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+}
+
+.hint {
+    margin: 9px 0 0;
+    color: #82766a;
+    font-size: 12px;
+}
+
+.joinForm {
+    display: flex;
+    gap: 8px;
+}
+
+.input {
+    min-width: 0;
+    flex: 1;
+    padding: 13px 14px;
+    border: 1px solid #d5c9bb;
+    border-radius: 10px;
+    background: white;
+    color: #302a24;
+    font-size: 15px;
+    outline: none;
+    transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+.input::placeholder {
+    color: #aaa095;
+}
+
+.input:focus {
+    border-color: #8b5e3c;
+    box-shadow: 0 0 0 3px rgba(139, 94, 60, 0.12);
+}
+
+@media (max-width: 520px) {
+    .container {
+        padding: 20px 14px;
+    }
+
+    .card {
+        padding: 34px 24px;
+        border-radius: 16px;
+    }
+
+    .title {
+        font-size: 36px;
+    }
+}

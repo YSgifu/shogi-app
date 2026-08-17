@@ -78,10 +78,20 @@ export default function OnlineBoard({
     const [isFirstPlayer, setIsFirstPlayer] = useState(false);
     const [isAttackMode, setIsAttackMode] = useState(false);
     const [attackPieces, setAttackPieces] = useState<number[]>([]);
+
+    const [checkmatePlayer, setCheckmatePlayer] =
+    useState<Player | null>(null);
+
+    const [showCheckmateDialog, setShowCheckmateDialog] =
+        useState(false);
+
+    const [showWinAnimation, setShowWinAnimation] =
+        useState(false);
     
 
     const boardRef = useRef<Board>(currentBoard);
     const handsRef = useRef<Hands>(hands);
+    const myPlayerRef = useRef<Player | null>(myPlayer);
 
     const dropSquares =
         selectedHandPiece
@@ -144,6 +154,12 @@ export default function OnlineBoard({
         console.log("hands state更新:", hands);
     }, [hands]);
 
+    useEffect(() => {
+        myPlayerRef.current = myPlayer;
+    }, [myPlayer]);
+
+    
+
     // ==================================================================================================
 
     // ===== WebSocket接続・サーバーからのMove受信処理、自分の盤面に反映 =====
@@ -181,12 +197,46 @@ export default function OnlineBoard({
                 return;
             }
 
+            if (message.type === "resign") {
+                setWinner(message.player === "sente" ? "gote" : "sente");
+                setShowWinAnimation(true);
+                return;
+            }
+
+            if (message.type === "opponent-disconnected") {
+                setMessage("相手との接続が切れました");
+                return;
+            }
+
             if (message.type === "move") {
                 const result = applyMove(
                     boardRef.current,
                     handsRef.current,
                     message.move
                 );
+
+                const currentMyPlayer = myPlayerRef.current;
+
+                if (
+                    currentMyPlayer &&
+                    isCheckmate(
+                        result.board,
+                        currentMyPlayer,
+                        result.hands
+                    )
+                ) {
+                    // 相手の一手で自分が詰んだ
+                    setWinner(message.move.player);
+                    setShowWinAnimation(true);
+                } else if (
+                    currentMyPlayer &&
+                    isInCheck(
+                        result.board,
+                        currentMyPlayer
+                    )
+                ) {
+                    setMessage("王手です");
+                }
 
 
                 setCurrentBoard(result.board);
@@ -240,6 +290,7 @@ export default function OnlineBoard({
             move
         );
 
+
         setCurrentBoard(result.board);
         setHands(result.hands);
 
@@ -257,6 +308,8 @@ export default function OnlineBoard({
 
     // 盤上の駒を選択する共通処理
     function selectSquare(rowIndex: number, colIndex: number) {
+        if (winner) return;
+
         setSelectedSquare({
             row: rowIndex,
             col: colIndex,
@@ -407,6 +460,8 @@ export default function OnlineBoard({
 
     // 合体！ 
     function handleSquareClick(rowIndex: number, colIndex: number) {
+        if (winner) return;
+
         // ===== 効き表示モード =====
         if (isAttackMode) {
             const piece = currentBoard[rowIndex][colIndex];
@@ -623,12 +678,49 @@ export default function OnlineBoard({
     function confirmPreview(promote: boolean) {
         if (!previewMove) return;
 
-        sendMove(
-            previewMove.from,
-            previewMove.to,
+        // 成る / 成らないを反映したMoveを作る
+        const move: Move = {
+            ...previewMove,
             promote,
-            previewMove.piece,
-            previewMove.capturedPieceType
+        };
+
+        // 成り/不成を反映した盤面を作る
+        const result = applyMove(
+            currentBoard,
+            hands,
+            move
+        );
+
+        const opponent =
+            move.player === "sente"
+                ? "gote"
+                : "sente";
+
+        // このMoveが詰みになるか判定
+        if (
+            isCheckmate(
+                result.board,
+                opponent,
+                result.hands
+            )
+        ) {
+            // 詰みになるMoveを保存
+            setPreviewMove(move);
+
+            // 詰みダイアログを表示
+            setCheckmatePlayer(move.player);
+            setShowCheckmateDialog(true);
+
+            return;
+        }
+
+        // 詰みでなければ通常通り確定
+        sendMove(
+            move.from,
+            move.to,
+            move.promote,
+            move.piece,
+            move.capturedPieceType
         );
     }
 
@@ -644,6 +736,26 @@ export default function OnlineBoard({
             clearTimeout(timer);
         };
     }, [message]);
+
+    const resign = () => {
+        if (winner) return;
+        if (!myPlayer) return;
+
+        socketRef.current?.send(
+            JSON.stringify({
+                type: "resign",
+                player: myPlayer,
+            })
+        );
+
+        setWinner(
+            myPlayer === "sente"
+                ? "gote"
+                : "sente"
+        );
+
+        setShowWinAnimation(true);
+    };
 
     // ==================================================================================================
 
@@ -819,7 +931,7 @@ export default function OnlineBoard({
                                     })
                                 )}
 
-                                {previewBoard !== null && previewMove && (
+                                {previewBoard !== null && previewMove && !showCheckmateDialog && (
                                     (() => {
                                         const previewDisplayRow =
                                             myPlayer === "gote"
@@ -888,6 +1000,65 @@ export default function OnlineBoard({
                                 )}
 
                             </div>
+
+                            {showWinAnimation && winner && (
+                                <div className="win-overlay">
+                                    <div className="win-message">
+                                        {winner === "sente"
+                                            ? "先手の勝ち！"
+                                            : "後手の勝ち！"}
+                                    </div>
+                                </div>
+                            )}
+
+                            {showCheckmateDialog && (
+                                <div className="checkmate-overlay">
+                                    <div className="checkmate-dialog">
+                                        <div className="checkmate-title">
+                                            詰み
+                                        </div>
+
+                                        <div className="checkmate-subtitle">
+                                            この一手で勝負が決まります
+                                        </div>
+
+                                        <div className="checkmate-actions">
+                                            <button
+                                                onClick={() => {
+                                                    if (!checkmatePlayer || !previewMove) return;
+
+                                                    sendMove(
+                                                        previewMove.from,
+                                                        previewMove.to,
+                                                        previewMove.promote,
+                                                        previewMove.piece,
+                                                        previewMove.capturedPieceType
+                                                    );
+
+                                                    setWinner(checkmatePlayer);
+                                                    setShowWinAnimation(true);
+                                                    setShowCheckmateDialog(false);
+                                                    setCheckmatePlayer(null);
+                                                }}
+                                            >
+                                                確定
+                                            </button>
+
+                                            <button
+                                                onClick={() => {
+                                                    cancelPreview();
+                                                    setShowCheckmateDialog(false);
+                                                    setCheckmatePlayer(null);
+                                                }}
+                                            >
+                                                キャンセル
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+
                         </div>
 
 
@@ -995,6 +1166,10 @@ export default function OnlineBoard({
                                 </button>
                             </div>
                         </div>
+
+                        <button onClick={resign}>
+                            投了
+                        </button>
 
                     </div>
 

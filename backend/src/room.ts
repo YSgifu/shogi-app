@@ -127,6 +127,31 @@ export class Room {
                 return;
             }
 
+            // ===== 投了処理 =====
+            if (message.type === "resign") {
+                const client = this.clients.find(
+                    (client) => client.socket === server
+                );
+
+                if (!client) return;
+
+                for (const opponent of this.clients) {
+                    if (
+                        opponent.socket !== server &&
+                        opponent.socket.readyState === WebSocket.OPEN
+                    ) {
+                        opponent.socket.send(
+                            JSON.stringify({
+                                type: "resign",
+                                player: client.player,
+                            })
+                        );
+                    }
+                }
+
+                return;
+            }
+
             // ===== 既存のMove処理 =====
             const move = message as Move;
 
@@ -173,6 +198,17 @@ export class Room {
             this.clients = this.clients.filter(
                 (client) => client.socket !== server
             );
+
+            // 残っている相手に切断を通知
+            for (const client of this.clients) {
+                if (client.socket.readyState === WebSocket.OPEN) {
+                    client.socket.send(
+                        JSON.stringify({
+                            type: "opponent-disconnected",
+                        })
+                    );
+                }
+            }
         });
 
         return new Response(null, {

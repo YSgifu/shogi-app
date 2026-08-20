@@ -151,9 +151,9 @@ export default function OnlineBoard({
         handsRef.current = hands;
     }, [hands]);
 
-    useEffect(() => {
-        console.log("hands state更新:", hands);
-    }, [hands]);
+    // useEffect(() => {
+    //     console.log("hands state更新:", hands);
+    // }, [hands]);
 
     useEffect(() => {
         myPlayerRef.current = myPlayer;
@@ -186,10 +186,10 @@ export default function OnlineBoard({
             const message = JSON.parse(event.data);
 
             if (message.type === "player-position") {
-                console.log(
-                    "player-position受信:",
-                    message.isFirstPlayer
-                );
+                // console.log(
+                //     "player-position受信:",
+                //     message.isFirstPlayer
+                // );
 
                 setIsFirstPlayer(message.isFirstPlayer);
                 return;
@@ -272,7 +272,7 @@ export default function OnlineBoard({
             player,
         };
 
-        console.log("先後選択:", message);
+        // console.log("先後選択:", message);
 
         socketRef.current?.send(JSON.stringify(message));
     };
@@ -830,7 +830,7 @@ export default function OnlineBoard({
                                                 )
                                             }
                                         >
-                                            <div className={`piece ${opponent}`}>
+                                            <div className={`piece ${opponent} ${type.toLowerCase()}`}>
                                                 {pieceNames[type as keyof typeof pieceNames]}
                                             </div>
 
@@ -1117,8 +1117,6 @@ export default function OnlineBoard({
 
                         </div>
 
-
-
                         <div className="hand bottom-hand">
                             <div className="hand-pieces">
                                 {myPlayer && Object.entries(displayHands[myPlayer]).map(([type, count]) =>
@@ -1138,7 +1136,7 @@ export default function OnlineBoard({
                                                 )
                                             }
                                         >
-                                            <div className={`piece ${myPlayer}`}>
+                                            <div className={`piece ${opponent} ${type.toLowerCase()}`}>
                                                 {pieceNames[type as keyof typeof pieceNames]}
                                             </div>
 

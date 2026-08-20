@@ -35,12 +35,12 @@ export default function Home() {
             <div className={styles.card}>
                 <h1 className={styles.title}>将棋</h1>
 
-                <button
+                {/* <button
                     className={styles.soloButton}
                     onClick={() => router.push("/solo")}
                 >
                     ひとりで遊ぶ
-                </button>
+                </button> */}
 
                 <div className={styles.divider}>
                     <span>オンライン対戦</span>

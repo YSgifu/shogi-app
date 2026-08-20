@@ -25,6 +25,7 @@ export class Room {
     private selectedPlayer: Player | null = null;
 
     async fetch(request: Request): Promise<Response> {
+
         // ===== 切断済みのクライアントを削除 =====
         this.clients = this.clients.filter(
             (client) => client.socket.readyState === WebSocket.OPEN
@@ -60,12 +61,26 @@ export class Room {
             player,
         });
 
+
         server.send(
             JSON.stringify({
                 type: "player-position",
                 isFirstPlayer,
             })
         );
+
+        if (this.clients.length === 2) {
+
+            for (const client of this.clients) {
+                console.log("送信対象:", client.player);
+
+                client.socket.send(
+                    JSON.stringify({
+                        type: "opponent-joined",
+                    })
+                );
+            }
+        }
 
 
         server.addEventListener("message", (event) => {

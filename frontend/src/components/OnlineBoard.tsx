@@ -93,6 +93,7 @@ export default function OnlineBoard({
     const handsRef = useRef<Hands>(hands);
     const myPlayerRef = useRef<Player | null>(myPlayer);
     const moveSoundRef = useRef<HTMLAudioElement | null>(null);
+    const [opponentJoined, setOpponentJoined] = useState(false);
 
     const dropSquares =
         selectedHandPiece
@@ -172,26 +173,24 @@ export default function OnlineBoard({
     useEffect(() => {
         const wsUrl = "wss://backend.asahi-dev.workers.dev";
 
+        // const wsUrl = "ws://127.0.0.1:8787"
+
         const socket = new WebSocket(
             `${wsUrl}/api/rooms/${roomId}/ws`
         );
 
         socketRef.current = socket;
 
-        socket.onopen = () => {
-            console.log("接続成功");
-        };
-
         socket.onmessage = (event) => {
             const message = JSON.parse(event.data);
 
             if (message.type === "player-position") {
-                // console.log(
-                //     "player-position受信:",
-                //     message.isFirstPlayer
-                // );
-
                 setIsFirstPlayer(message.isFirstPlayer);
+                return;
+            }
+
+            if (message.type === "opponent-joined") {
+                setOpponentJoined(true);
                 return;
             }
 
@@ -851,7 +850,11 @@ export default function OnlineBoard({
 
                             {/* 手番選択表示 */}
                             {myPlayer === null && (
-                                isFirstPlayer ? (
+                                !opponentJoined ? (
+                                    <p className="waiting-message">
+                                        相手の入室を待っています
+                                    </p>
+                                ) : isFirstPlayer ? (
                                     <div className="player-select">
                                         <div className="player-select-title">
                                             自分の手番を選択してください

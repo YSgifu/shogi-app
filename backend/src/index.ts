@@ -22,10 +22,9 @@ app.use(
 
 // ルーム作成
 app.post("/api/rooms", (c) => {
-    const roomId = Math.random()
-        .toString(36)
-        .substring(2, 8)
-        .toUpperCase();
+    const roomId = Math.floor(
+        100000 + Math.random() * 900000
+    ).toString();
 
     return c.json({ roomId });
 });

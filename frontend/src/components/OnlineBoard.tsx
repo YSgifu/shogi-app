@@ -249,7 +249,7 @@ export default function OnlineBoard({
                         currentMyPlayer
                     )
                 ) {
-                    setMessage("王手です");
+                    setMessage("王手！");
                 }
 
 
@@ -783,37 +783,28 @@ export default function OnlineBoard({
 
     return (
         <div>
-            <p>自分: {myPlayer ?? "未決定"}</p>
-            <p>現在のターン: {turn}</p>
-
             <div
-                className={`shogi-app ${
-                    myPlayer === "sente"
-                        ? "sente-theme"
-                        : "gote-theme"
-                }`}
+                className={`shogi-app`}
             >
 
-                {myPlayer === null && (
-                    isFirstPlayer ? (
-                        <div>
-                            <button onClick={() => selectPlayer("sente")}>
-                                先手
-                            </button>
-
-                            <button onClick={() => selectPlayer("gote")}>
-                                後手
-                            </button>
-                        </div>
-                    ) : (
-                        <p>相手の選択を待っています</p>
-                    )
-                )}
-
                 {myPlayer !== null && (
-                    <p>
-                        {isMyTurn ? "あなたの手番です" : "相手の手番です"}
-                    </p>
+                    <div className="game-status">
+                        <span>
+                            自分：{myPlayer === "sente" ? "先手" : "後手"}
+                        </span>
+
+                        <span className="status-divider">｜</span>
+
+                        <span>
+                            現在のターン：{turn === "sente" ? "先手" : "後手"}
+                        </span>
+
+                        <span className="status-divider">｜</span>
+
+                        <span className="turn-status">
+                            {isMyTurn ? "あなたの手番です" : "相手の手番です"}
+                        </span>
+                    </div>
                 )}
 
                 <div className="game-area">
@@ -858,10 +849,50 @@ export default function OnlineBoard({
                         {/* 盤面 */}
                         <div className="board-container">
 
+                            {/* 手番選択表示 */}
+                            {myPlayer === null && (
+                                isFirstPlayer ? (
+                                    <div className="player-select">
+                                        <div className="player-select-title">
+                                            自分の手番を選択してください
+                                        </div>
+
+                                        <div className="player-select-buttons">
+                                            <button
+                                                className="player-button sente-button"
+                                                onClick={() => selectPlayer("sente")}
+                                            >
+                                                先手
+                                            </button>
+
+                                            <button
+                                                className="player-button gote-button"
+                                                onClick={() => selectPlayer("gote")}
+                                            >
+                                                後手
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="waiting-message">
+                                        相手の選択を待っています
+                                    </p>
+                                )
+                            )}
+
+
                             <div className="board">
-                                {/* ダイアログ */}
+                                {/* メッセージ */}
                                 {message && (
-                                    <div className="board-message">
+                                    <div
+                                        className={`board-message ${
+                                            message.length >= 12
+                                                ? "long"
+                                                : message.length >= 8
+                                                    ? "medium"
+                                                    : ""
+                                        }`}
+                                    >
                                         {message}
                                     </div>
                                 )}
@@ -907,8 +938,9 @@ export default function OnlineBoard({
 
                                         // ===== 自分から見て相手の駒なら180度回転 =====
                                         const shouldRotatePiece =
-                                            piece !== null &&
-                                            piece.player !== myPlayer;
+                                            myPlayer === null
+                                                ? piece?.player === "gote"
+                                                : piece?.player !== myPlayer;
 
                                         return (
                                             <div
@@ -941,6 +973,8 @@ export default function OnlineBoard({
                                                             ${shouldRotatePiece ? "rotate-piece" : "my-piece"}
                                                             ${isSelected ? "selected" : ""}
                                                             ${isAttackPiece ? "attack-piece" : ""}
+                                                            ${piece.type.toLowerCase()}
+                                                            ${piece.promoted ? "promoted" : ""}
                                                         `}
                                                     >
                                                         {piece.promoted
@@ -1189,7 +1223,7 @@ export default function OnlineBoard({
                             </div>
                         </div>
 
-                        <button onClick={resign}>
+                        <button className="resign-button" onClick={resign}>
                             投了
                         </button>
 

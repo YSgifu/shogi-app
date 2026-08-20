@@ -11,12 +11,11 @@ export default function RoomPage() {
     const roomId = params.roomId;
 
     return (
-        <main>
-            <h1>オンライン対戦</h1>
-
-            <p>
-                ルームID: {roomId}
-            </p>
+        <main className="online-page">
+            <header className="online-header">
+                <h1>オンライン対戦</h1>
+                <p>ルームID: {roomId}</p>
+            </header>
 
             <OnlineBoard
                 board={initialBoard}

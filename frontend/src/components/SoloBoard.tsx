@@ -268,7 +268,7 @@ export default function SoloBoard({ board }: BoardProps) {
                 setCheckmatePlayer(selectedHandPiece.player);
                 setShowCheckmateDialog(true);
             } else if (isInCheck(result.board, opponent)) {
-                setMessage("王手です");
+                setMessage("王手");
             }
 
             setPreviewCapturedPieceType(null);
@@ -373,7 +373,7 @@ export default function SoloBoard({ board }: BoardProps) {
                 setCheckmatePlayer(movingPiece.player);
                 setShowCheckmateDialog(true);
             } else if (isInCheck(result.board, opponent)) {
-                setMessage("王手です");
+                setMessage("王手");
             }
 
             setCurrentBoard(result.board);
@@ -899,6 +899,8 @@ export default function SoloBoard({ board }: BoardProps) {
                                                         ${piece.player} 
                                                         ${isSelected ? "selected" : ""}
                                                         ${isAttackPiece ? "attack-piece" : ""}
+                                                        ${piece.type.toLowerCase()}
+                                                        ${piece.promoted ? "promoted" : ""}
                                                         `}
                                                 >
                                                     {piece.promoted

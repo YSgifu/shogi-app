@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Board, Hands, Player, CapturedPieceType, PieceType, Move } from "@/types/shogi";
 import { pieceNames, promotedPieceNames, createPiece } from "@/lib/piece";
-import { getMovableSquares, canPromote, canDropPiece, getAttackSquares, applyMove } from "@/lib/moves";
+import { getMovableSquares, canPromote, canDropPiece, getAttackSquares, applyMove, rebuildGameState } from "@/lib/moves";
 import { isInCheck, isLegalMove, isCheckmate } from "@/lib/check";
 
 
@@ -82,18 +82,22 @@ export default function OnlineBoard({
     const [checkmatePlayer, setCheckmatePlayer] =
     useState<Player | null>(null);
 
-    const [showCheckmateDialog, setShowCheckmateDialog] =
-        useState(false);
+    const [showCheckmateDialog, setShowCheckmateDialog] = useState(false);
+    const [showWinAnimation, setShowWinAnimation] = useState(false);
 
-    const [showWinAnimation, setShowWinAnimation] =
-        useState(false);
+    const [opponentJoined, setOpponentJoined] = useState(false);
+    const [showUndoDialog, setShowUndoDialog] = useState(false);
+    const [undoRequester, setUndoRequester] = useState<Player | null>(null);
+    const [undoRequestPending, setUndoRequestPending] = useState(false);
+    const [undoUsedThisTurn, setUndoUsedThisTurn] = useState(false);
+    const [showUndoWaitingDialog, setShowUndoWaitingDialog] = useState(false);
     
 
     const boardRef = useRef<Board>(currentBoard);
     const handsRef = useRef<Hands>(hands);
     const myPlayerRef = useRef<Player | null>(myPlayer);
     const moveSoundRef = useRef<HTMLAudioElement | null>(null);
-    const [opponentJoined, setOpponentJoined] = useState(false);
+
 
     const dropSquares =
         selectedHandPiece
@@ -116,7 +120,7 @@ export default function OnlineBoard({
             : [];
 
     
-    // 効き表示 
+    // 利き表示 
     const attackBoard = previewBoard ?? currentBoard;
 
     const attackSquares = attackPieces.flatMap((pieceId) => {
@@ -138,6 +142,17 @@ export default function OnlineBoard({
             position.col
         );
     });
+
+    const finishGame = (winner: Player) => {
+        setWinner(winner);
+        setShowWinAnimation(true);
+
+        // 待った関連をすべて解除
+        setShowUndoDialog(false);
+        setShowUndoWaitingDialog(false);
+        setUndoRequestPending(false);
+        setUndoRequester(null);
+    };
 
 
     // ==================================================================================================
@@ -165,15 +180,14 @@ export default function OnlineBoard({
             new Audio("/sounds/japanese-chess-piece1.mp3");
     }, []);
 
-    
 
     // ==================================================================================================
 
     // ===== WebSocket接続・サーバーからのMove受信処理、自分の盤面に反映 =====
     useEffect(() => {
-        const wsUrl = "wss://backend.asahi-dev.workers.dev";
+        // const wsUrl = "wss://backend.asahi-dev.workers.dev";
 
-        // const wsUrl = "ws://127.0.0.1:8787"
+        const wsUrl = "ws://127.0.0.1:8787"
 
         const socket = new WebSocket(
             `${wsUrl}/api/rooms/${roomId}/ws`
@@ -205,8 +219,11 @@ export default function OnlineBoard({
             }
 
             if (message.type === "resign") {
-                setWinner(message.player === "sente" ? "gote" : "sente");
-                setShowWinAnimation(true);
+                finishGame(
+                    message.player === "sente"
+                        ? "gote"
+                        : "sente"
+                );
                 return;
             }
 
@@ -215,7 +232,80 @@ export default function OnlineBoard({
                 return;
             }
 
+            if (message.type === "undo-request") {
+                setUndoRequester(message.player);
+                setShowUndoDialog(true);
+                return;
+            }
+
+            if (message.type === "undo-response") {
+                setUndoRequestPending(false);
+                setShowUndoWaitingDialog(false);
+
+                if (!message.accepted) {
+                    setMessage("待ったが拒否されました");
+                }
+
+                return;
+            }
+
+            if (message.type === "undo-error") {
+                setUndoRequestPending(false);
+                setMessage(message.reason);
+                return;
+            }
+
+            if (message.type === "undo") {
+                const result = rebuildGameState(
+                    message.moves
+                );
+
+                // ===== 待ったが承認されたことを表示 =====
+                setMessage("待ったが承認されました");
+
+                // ===== 正式な盤面・持ち駒に戻す =====
+                setCurrentBoard(result.board);
+                setHands(result.hands);
+
+                // ===== 仮移動状態を解除 =====
+                setPreviewBoard(null);
+                setPreviewMove(null);
+                setPreviewHands(null);
+
+                // ===== 盤上の選択状態を解除 =====
+                setSelectedSquare(null);
+                setMovableSquares([]);
+
+                // ===== 持ち駒の選択状態を解除 =====
+                setSelectedHandPiece(null);
+
+                // ===== 成り選択状態を解除 =====
+                setCanPromotePreview(false);
+
+                // ===== 利き表示を解除 =====
+                setAttackPieces([]);
+
+                // ===== 待ったダイアログを解除 =====
+                setShowUndoDialog(false);
+                setUndoRequester(null);
+
+                // ===== 詰み関連を解除 =====
+                setShowCheckmateDialog(false);
+                setCheckmatePlayer(null);
+
+                // ===== 待った要求中を解除 =====
+                setUndoRequestPending(false);
+
+                setShowUndoWaitingDialog(false);
+
+                // ===== ターンを更新 =====
+                setTurn(message.turn);
+
+                return;
+            }
+
             if (message.type === "move") {
+
                 const result = applyMove(
                     boardRef.current,
                     handsRef.current,
@@ -239,8 +329,7 @@ export default function OnlineBoard({
                     )
                 ) {
                     // 相手の一手で自分が詰んだ
-                    setWinner(message.move.player);
-                    setShowWinAnimation(true);
+                    finishGame(message.move.player);
                 } else if (
                     currentMyPlayer &&
                     isInCheck(
@@ -303,6 +392,16 @@ export default function OnlineBoard({
             move
         );
 
+        // ===== 王手判定 =====
+        const opponent =
+            myPlayer === "sente"
+                ? "gote"
+                : "sente";
+
+        if (isInCheck(result.board, opponent)) {
+            setMessage("王手！");
+        }
+
 
         setCurrentBoard(result.board);
         setHands(result.hands);
@@ -316,6 +415,9 @@ export default function OnlineBoard({
         }
 
         socketRef.current?.send(JSON.stringify(move));
+
+        // ===== 待った使用制限を解除 =====
+        setUndoUsedThisTurn(false);
 
         // ===== 仮移動状態を解除して通常モードへ戻る =====
         setPreviewBoard(null);
@@ -482,8 +584,9 @@ export default function OnlineBoard({
     // 合体！ 
     function handleSquareClick(rowIndex: number, colIndex: number) {
         if (winner) return;
+        if (showUndoDialog) return;
 
-        // ===== 効き表示モード =====
+        // ===== 利き表示モード =====
         if (isAttackMode) {
             const piece = currentBoard[rowIndex][colIndex];
 
@@ -507,6 +610,11 @@ export default function OnlineBoard({
 
         // ===== 仮移動中 =====
         if (previewMove !== null) {
+            // 成り選択中は、駒をもう一度クリックしても確定しない
+            if (canPromotePreview) {
+                return;
+            }
+            // もう一度クリックしたら確定
             if (
                 previewMove.to.row === rowIndex &&
                 previewMove.to.col === colIndex
@@ -543,7 +651,7 @@ export default function OnlineBoard({
         type: CapturedPieceType,
         player: Player
     ) {
-        // ===== 効き表示モード中は持ち駒を選択できない =====
+        // ===== 利き表示モード中は持ち駒を選択できない =====
         if (isAttackMode) return;
         
         // ===== 仮移動中は持ち駒を選択できない =====
@@ -551,6 +659,9 @@ export default function OnlineBoard({
 
         // ===== 勝敗が決まっていたら選択できない =====
         if (winner) return;
+
+        // ===== 待った承認・拒否中は選択できない =====
+        if (showUndoDialog) return;
 
         // ===== 自分の手番ではない場合は選択できない =====
         if (myPlayer !== turn) return;
@@ -663,7 +774,7 @@ export default function OnlineBoard({
 
     // ==================================================================================================
 
-    // ===== 指定したプレイヤーの全駒の効きを表示 =====
+    // ===== 指定したプレイヤーの全駒の利きを表示 =====
     function showAllAttackPieces(player: Player) {
         const pieceIds = currentBoard
             .flatMap((row) => row)
@@ -678,7 +789,7 @@ export default function OnlineBoard({
         ]);
     }
 
-    // ===== 効き表示をすべて解除 =====
+    // ===== 利き表示をすべて解除 =====
     function clearAttackPieces() {
         setAttackPieces([]);
     }
@@ -758,6 +869,7 @@ export default function OnlineBoard({
         };
     }, [message]);
 
+    // 投了
     const resign = () => {
         if (winner) return;
         if (!myPlayer) return;
@@ -769,13 +881,11 @@ export default function OnlineBoard({
             })
         );
 
-        setWinner(
+        finishGame(
             myPlayer === "sente"
                 ? "gote"
                 : "sente"
         );
-
-        setShowWinAnimation(true);
     };
 
     // ==================================================================================================
@@ -789,13 +899,13 @@ export default function OnlineBoard({
                 {myPlayer !== null && (
                     <div className="game-status">
                         <span>
-                            自分：{myPlayer === "sente" ? "先手" : "後手"}
+                            自分の手番：{myPlayer === "sente" ? "先手" : "後手"}
                         </span>
 
                         <span className="status-divider">｜</span>
 
                         <span>
-                            現在のターン：{turn === "sente" ? "先手" : "後手"}
+                            現在の手番：{turn === "sente" ? "先手" : "後手"}
                         </span>
 
                         <span className="status-divider">｜</span>
@@ -804,6 +914,8 @@ export default function OnlineBoard({
                             {isMyTurn ? "あなたの手番です" : "相手の手番です"}
                         </span>
                     </div>
+
+                    
                 )}
 
                 <div className="game-area">
@@ -883,6 +995,62 @@ export default function OnlineBoard({
                                 )
                             )}
 
+                            {/* 待った承認表示 */}
+                            {showUndoDialog && (
+                                <div className="player-select">
+                                    <div className="player-select-title">
+                                        相手が待ったを求めています
+                                    </div>
+
+                                    <div className="player-select-buttons">
+                                        <button
+                                            className="player-button sente-button"
+                                            onClick={() => {
+                                                socketRef.current?.send(
+                                                    JSON.stringify({
+                                                        type: "undo-response",
+                                                        player: undoRequester,
+                                                        accepted: true,
+                                                    })
+                                                );
+
+                                                setShowUndoDialog(false);
+                                                setUndoRequester(null);
+                                            }}
+                                        >
+                                            承認
+                                        </button>
+
+                                        <button
+                                            className="player-button gote-button"
+                                            onClick={() => {
+                                                socketRef.current?.send(
+                                                    JSON.stringify({
+                                                        type: "undo-response",
+                                                        player: undoRequester,
+                                                        accepted: false,
+                                                    })
+                                                );
+
+                                                setShowUndoDialog(false);
+                                                setUndoRequester(null);
+                                            }}
+                                        >
+                                            拒否
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 待った承認待ち表示 */}
+                            {showUndoWaitingDialog && (
+                                <div className="player-select">
+                                    <div className="player-select-title">
+                                        待ったの承認を待っています
+                                    </div>
+                                </div>
+                            )}
+
 
                             <div className="board">
                                 {/* メッセージ */}
@@ -928,7 +1096,7 @@ export default function OnlineBoard({
                                                 square.col === actualCol
                                         );
 
-                                        // ===== 効きを表示している駒か判定 =====
+                                        // ===== 利きを表示している駒か判定 =====
                                         const isAttack = attackSquares.some(
                                             (square) =>
                                                 square.row === actualRow &&
@@ -1023,6 +1191,7 @@ export default function OnlineBoard({
                                                 {canPromotePreview && (
                                                     <>
                                                         <button
+                                                            disabled={showUndoDialog}
                                                             onClick={() => {
                                                                 confirmPreview(true);
                                                             }}
@@ -1031,6 +1200,7 @@ export default function OnlineBoard({
                                                         </button>
 
                                                         <button
+                                                            disabled={showUndoDialog}
                                                             onClick={() => {
                                                                 confirmPreview(false);
                                                             }}
@@ -1042,6 +1212,7 @@ export default function OnlineBoard({
 
                                                 {!canPromotePreview && (
                                                     <button
+                                                        disabled={showUndoDialog}
                                                         onClick={() => {
                                                             confirmPreview(false);
                                                         }}
@@ -1050,7 +1221,10 @@ export default function OnlineBoard({
                                                     </button>
                                                 )}
 
-                                                <button onClick={cancelPreview}>
+                                                <button
+                                                    disabled={showUndoDialog}
+                                                    onClick={cancelPreview}
+                                                >
                                                     キャンセル
                                                 </button>
                                             </div>
@@ -1083,6 +1257,7 @@ export default function OnlineBoard({
 
                                         <div className="checkmate-actions">
                                             <button
+                                                disabled={showUndoDialog}
                                                 onClick={() => {
                                                     if (!checkmatePlayer || !previewMove) return;
 
@@ -1094,8 +1269,7 @@ export default function OnlineBoard({
                                                         previewMove.capturedPieceType
                                                     );
 
-                                                    setWinner(checkmatePlayer);
-                                                    setShowWinAnimation(true);
+                                                    finishGame(checkmatePlayer);
                                                     setShowCheckmateDialog(false);
                                                     setCheckmatePlayer(null);
                                                 }}
@@ -1104,6 +1278,7 @@ export default function OnlineBoard({
                                             </button>
 
                                             <button
+                                                disabled={showUndoDialog}
                                                 onClick={() => {
                                                     cancelPreview();
                                                     setShowCheckmateDialog(false);
@@ -1167,6 +1342,7 @@ export default function OnlineBoard({
 
                             <button
                                 className={!isAttackMode ? "active" : ""}
+                                disabled={showUndoDialog}
                                 onClick={() => {
                                     setIsAttackMode(false);
                                 }}
@@ -1176,11 +1352,12 @@ export default function OnlineBoard({
 
                             <button
                                 className={isAttackMode ? "active" : ""}
+                                disabled={showUndoDialog}
                                 onClick={() => {
                                     setIsAttackMode(true);
                                 }}
                             >
-                                効き表示モード
+                                利き表示モード
                             </button>
                         </div>
 
@@ -1192,6 +1369,7 @@ export default function OnlineBoard({
                             <div className="attack-controls-buttons">
                                 <button
                                     className="attack-all-my"
+                                    disabled={showUndoDialog}
                                     onClick={() => {
                                         if (myPlayer) {
                                             showAllAttackPieces(myPlayer);
@@ -1203,6 +1381,7 @@ export default function OnlineBoard({
 
                                 <button
                                     className="attack-all-opponent"
+                                    disabled={showUndoDialog}
                                     onClick={() => {
                                         if (myPlayer) {
                                             const opponent: Player =
@@ -1217,6 +1396,7 @@ export default function OnlineBoard({
 
                                 <button
                                     className="attack-clear"
+                                    disabled={showUndoDialog}
                                     onClick={clearAttackPieces}
                                 >
                                     消す
@@ -1224,8 +1404,35 @@ export default function OnlineBoard({
                             </div>
                         </div>
 
-                        <button className="resign-button" onClick={resign}>
+                        <button 
+                            className="resign-button" 
+                            onClick={resign}
+                            disabled={showUndoDialog}
+                        >
                             投了
+                        </button>
+
+                        <button
+                            disabled={
+                                winner !== null ||
+                                myPlayer === turn ||
+                                undoRequestPending ||
+                                undoUsedThisTurn ||
+                                showUndoDialog
+                            }
+                            onClick={() => {
+                                setUndoRequestPending(true);
+                                setUndoUsedThisTurn(true);
+                                setShowUndoWaitingDialog(true);
+
+                                socketRef.current?.send(
+                                    JSON.stringify({
+                                        type: "undo-request",
+                                    })
+                                );
+                            }}
+                        >
+                            待った
                         </button>
 
                     </div>

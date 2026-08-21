@@ -12,6 +12,7 @@ type Move = {
     };
     promote: boolean;
     piece?: string;
+    capturedPieceType?: string;
 };
 
 export class Room {
@@ -23,6 +24,10 @@ export class Room {
     private turn: Player = "sente";
 
     private selectedPlayer: Player | null = null;
+
+    private moves: Move[] = [];
+
+    private undoRequester: Player | null = null;
 
     async fetch(request: Request): Promise<Response> {
 
@@ -90,10 +95,6 @@ export class Room {
                 // ===== 1人目の選択を保存 =====
                 this.selectedPlayer = message.player;
 
-                console.log(
-                    "先後保存:",
-                    this.selectedPlayer
-                );
 
                 // ===== 2人目がまだいない場合はここで終了 =====
                 if (this.clients.length < 2) {
@@ -106,19 +107,9 @@ export class Room {
                         ? "gote"
                         : "sente";
 
-                console.log(
-                    "相手の手番:",
-                    opponentPlayer
-                );
-
                 // ===== Room内部の先後を更新 =====
                 this.clients[0].player = this.selectedPlayer!;
                 this.clients[1].player = opponentPlayer;
-
-                console.log(
-                    "Room内の先後:",
-                    this.clients.map((client) => client.player)
-                );
 
                 // ===== 先後を両者へ通知 =====
                 const firstClient = this.clients[0];
@@ -138,6 +129,128 @@ export class Room {
                     })
                 );
 
+                return;
+            }
+
+            if (message.type === "undo-request") {
+                if (this.undoRequester !== null) {
+                    return;
+                }
+                const client = this.clients.find(
+                    (client) => client.socket === server
+                );
+
+                if (!client) return;
+
+                // ===== すでに待った要求中 =====
+                if (this.undoRequester !== null) {
+                    server.send(
+                        JSON.stringify({
+                            type: "undo-error",
+                            reason: "すでに待ったを要求しています",
+                        })
+                    );
+
+                    return;
+                }
+
+                // ===== まだ一手も指されていない =====
+                if (this.moves.length === 0) {
+                    server.send(
+                        JSON.stringify({
+                            type: "undo-error",
+                            reason: "まだ対局が始まっていません",
+                        })
+                    );
+
+                    return;
+                }
+
+                // ===== 自分の手番中 =====
+                if (
+                    this.moves[this.moves.length - 1].player !== client.player
+                ) {
+                    server.send(
+                        JSON.stringify({
+                            type: "undo-error",
+                            reason: "自分の手番中には待ったを要求できません",
+                        })
+                    );
+
+                    return;
+                }
+
+                // ===== 待った要求を保存 =====
+                this.undoRequester = client.player;
+
+                // ===== 相手へ通知 =====
+                for (const opponent of this.clients) {
+                    if (
+                        opponent.socket !== server &&
+                        opponent.socket.readyState === WebSocket.OPEN
+                    ) {
+                        opponent.socket.send(
+                            JSON.stringify({
+                                type: "undo-request",
+                                player: client.player,
+                            })
+                        );
+                    }
+                }
+
+                return;
+            }
+
+            // ===== 待ったの承認・拒否 =====
+            if (message.type === "undo-response") {
+                const requester = this.clients.find(
+                    (client) => client.player === message.player
+                );
+
+                if (!requester) return;
+
+                // ===== 拒否 =====
+                if (!message.accepted) {
+                    requester.socket.send(
+                        JSON.stringify({
+                            type: "undo-response",
+                            accepted: false,
+                        })
+                    );
+
+                    // 待った要求を解除
+                    this.undoRequester = null;
+
+                    return;
+                }
+
+                // ===== 承認 =====
+                if (this.moves.length === 0) return;
+
+                // 最後のMoveを削除
+                const undoneMove = this.moves.pop();
+
+                // ターンを元に戻す
+                if (undoneMove) {
+                    this.turn = undoneMove.player;
+                }
+
+                // 待った要求を解除
+                this.undoRequester = null;
+
+                // 両者へ通知
+                for (const client of this.clients) {
+                    if (client.socket.readyState === WebSocket.OPEN) {
+                        client.socket.send(
+                            JSON.stringify({
+                                type: "undo",
+                                accepted: true,
+                                moves: this.moves,
+                                turn: this.turn,
+                            })
+                        );
+                    }
+                }
 
                 return;
             }
@@ -177,8 +290,9 @@ export class Room {
             if (!client) return;
 
             if (move.player !== client.player) return;
-
             if (move.player !== this.turn) return;
+
+            this.moves.push(move);
 
             this.turn =
                 this.turn === "sente"

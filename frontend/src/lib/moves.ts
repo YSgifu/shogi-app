@@ -1,5 +1,6 @@
 import type { Board, Hands, Player, CapturedPieceType, Move, Piece } from "@/types/shogi";
 import { createPiece } from "@/lib/piece";
+import { initialBoard, initialHands } from "@/lib/initialBoard";
 
 export type Square = {
     row: number;
@@ -854,5 +855,31 @@ export const applyMove = (board: Board, hands: Hands, move: Move): {
     return {
         board: nextBoard,
         hands: nextHands,
+    };
+};
+
+export const rebuildGameState = (
+    moves: Move[]
+): {
+    board: Board;
+    hands: Hands;
+} => {
+    let board = initialBoard;
+    let hands = initialHands;
+
+    for (const move of moves) {
+        const result = applyMove(
+            board,
+            hands,
+            move
+        );
+
+        board = result.board;
+        hands = result.hands;
+    }
+
+    return {
+        board,
+        hands,
     };
 };

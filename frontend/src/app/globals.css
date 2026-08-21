@@ -91,7 +91,7 @@ a {
 
     gap: 12px 10px;
 
-    margin-top: 10px;
+    margin-top: 0px;
 }
 
 .game-layout {
@@ -852,7 +852,9 @@ a {
     z-index: 100;
     pointer-events: none;
 
-    white-space: nowrap;
+    white-space: normal;
+    text-align: center;
+    width: 90%;
 }
 
 .board-message.medium {
@@ -1159,7 +1161,7 @@ a {
 .online-header {
     width: min(90vw, 700px);
 
-    margin: 16px auto 0px;
+    margin: 8px auto -4px;
 
     display: flex;
     align-items: baseline;
@@ -1194,7 +1196,7 @@ a {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
+    gap: 6px;
 
     margin: 0 auto 0px;
     padding: 8px 20px;

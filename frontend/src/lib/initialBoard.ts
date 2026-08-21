@@ -1,4 +1,4 @@
-import type { Board, PieceType } from "@/types/shogi";
+import type { Board, PieceType, Hands } from "@/types/shogi";
 import { createPiece } from "@/lib/piece";
 
 const sente = (type: PieceType) =>
@@ -78,3 +78,24 @@ export const initialBoard: Board = [
         sente("KY"),
     ],
 ];
+
+export const initialHands: Hands = {
+    sente: {
+        FU: 0,
+        KY: 0,
+        KE: 0,
+        GI: 0,
+        KI: 0,
+        KA: 0,
+        HI: 0,
+    },
+    gote: {
+        FU: 0,
+        KY: 0,
+        KE: 0,
+        GI: 0,
+        KI: 0,
+        KA: 0,
+        HI: 0,
+    },
+};

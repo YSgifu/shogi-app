@@ -46,18 +46,9 @@ export default function OnlineBoard({
     >([]);
     // 仮移動後の盤面
     const [previewBoard, setPreviewBoard] = useState<Board | null>(null);
-    // 仮移動後のプレイヤーに見せる盤面
-    const displayBoard =
-        myPlayer === "gote"
-            ? [...(previewBoard ?? currentBoard)]
-                .reverse()
-                .map((row) => [...row].reverse())
-            : previewBoard ?? currentBoard;
     // 仮移動モード中の持ち駒
     const [previewHands, setPreviewHands] =
         useState<Hands | null>(null);
-    // 仮移動後のプレイヤーに見せる持ち駒
-    const displayHands = previewHands ?? hands;
     // 仮移動の時のmoveを保存する用
     const [previewMove, setPreviewMove] = useState<Move | null>(null);
     // 仮移動後に成れるかを保存する用
@@ -91,7 +82,42 @@ export default function OnlineBoard({
     const [undoRequestPending, setUndoRequestPending] = useState(false);
     const [undoUsedThisTurn, setUndoUsedThisTurn] = useState(false);
     const [showUndoWaitingDialog, setShowUndoWaitingDialog] = useState(false);
+
+    const [replayMode, setReplayMode] = useState(false);
+    const [replayMoveIndex, setReplayMoveIndex] = useState(0);
+    const [replayMoves, setReplayMoves] = useState<Move[]>([]);
     
+    const replayResult = rebuildGameState(
+        replayMoves.slice(0, replayMoveIndex)
+    );
+
+    const boardForInteraction =
+        replayMode
+            ? replayResult.board
+            : previewBoard ?? currentBoard;
+
+    const boardToDisplay =
+        replayMode
+            ? replayResult?.board ?? currentBoard
+            : previewBoard ?? currentBoard;
+
+    // 仮移動後・棋譜再生中のプレイヤーに見せる盤面
+    const displayBoard =
+        myPlayer === "gote"
+            ? [...boardToDisplay]
+                .reverse()
+                .map((row) => [...row].reverse())
+        : boardToDisplay;
+
+    const handsToDisplay =
+        replayMode
+            ? replayResult.hands
+            : previewHands ?? hands;
+
+    const displayHands = handsToDisplay;
+    
+    
+
 
     const boardRef = useRef<Board>(currentBoard);
     const handsRef = useRef<Hands>(hands);
@@ -121,7 +147,7 @@ export default function OnlineBoard({
 
     
     // 利き表示 
-    const attackBoard = previewBoard ?? currentBoard;
+    const attackBoard = boardForInteraction;
 
     const attackSquares = attackPieces.flatMap((pieceId) => {
         const position = attackBoard
@@ -185,9 +211,9 @@ export default function OnlineBoard({
 
     // ===== WebSocket接続・サーバーからのMove受信処理、自分の盤面に反映 =====
     useEffect(() => {
-        // const wsUrl = "wss://backend.asahi-dev.workers.dev";
+        const wsUrl = "wss://backend.asahi-dev.workers.dev";
 
-        const wsUrl = "ws://127.0.0.1:8787"
+        // const wsUrl = "ws://127.0.0.1:8787"
 
         const socket = new WebSocket(
             `${wsUrl}/api/rooms/${roomId}/ws`
@@ -304,6 +330,15 @@ export default function OnlineBoard({
                 return;
             }
 
+            if (message.type === "replay") {
+                setReplayMoves(message.moves);
+                setReplayMoveIndex(0);
+                setReplayMode(true);
+
+                return;
+            }
+
+            // 相手の動きを反映する
             if (message.type === "move") {
 
                 const result = applyMove(
@@ -583,12 +618,11 @@ export default function OnlineBoard({
 
     // 合体！ 
     function handleSquareClick(rowIndex: number, colIndex: number) {
-        if (winner) return;
         if (showUndoDialog) return;
 
         // ===== 利き表示モード =====
         if (isAttackMode) {
-            const piece = currentBoard[rowIndex][colIndex];
+            const piece = boardForInteraction[rowIndex][colIndex];
 
             if (!piece) return;
 
@@ -607,6 +641,12 @@ export default function OnlineBoard({
 
             return;
         }
+
+        // ===== リプレイ中は通常操作禁止 =====
+        if (replayMode) return;
+
+        // ===== 対局終了後は操作禁止 =====
+        if (winner) return;
 
         // ===== 仮移動中 =====
         if (previewMove !== null) {
@@ -1121,12 +1161,12 @@ export default function OnlineBoard({
                                                         ? "promotion-zone"
                                                         : ""
                                                 }`}
-                                                onClick={() =>
+                                                onClick={() => {
                                                     handleSquareClick(
                                                         actualRow,
                                                         actualCol
-                                                    )
-                                                }
+                                                    );
+                                                }}
                                             >
                                                 <div
                                                     className={`square-overlay
@@ -1158,7 +1198,10 @@ export default function OnlineBoard({
                                     })
                                 )}
 
-                                {previewBoard !== null && previewMove && !showCheckmateDialog && (
+                                {!replayMode &&
+                                    previewBoard !== null &&
+                                    previewMove &&
+                                    !showCheckmateDialog && (
                                     (() => {
                                         const previewDisplayRow =
                                             myPlayer === "gote"
@@ -1234,7 +1277,7 @@ export default function OnlineBoard({
 
                             </div>
 
-                            {showWinAnimation && winner && (
+                            {showWinAnimation && winner && !replayMode && (
                                 <div className="win-overlay">
                                     <div className="win-message">
                                         {winner === "sente"
@@ -1333,6 +1376,10 @@ export default function OnlineBoard({
 
                     <div className="board-controls">
 
+                        <div className="board-controls-title">
+                            ゲーム操作
+                        </div>
+
                         <div className="mode-switch">
                             <div
                                 className={`mode-switch-slider ${
@@ -1363,7 +1410,7 @@ export default function OnlineBoard({
 
                         <div className="attack-controls">
                             <div className="attack-controls-title">
-                                一括表示
+                                利き一括表示
                             </div>
 
                             <div className="attack-controls-buttons">
@@ -1404,36 +1451,103 @@ export default function OnlineBoard({
                             </div>
                         </div>
 
-                        <button 
-                            className="resign-button" 
-                            onClick={resign}
-                            disabled={showUndoDialog}
-                        >
-                            投了
-                        </button>
+                        {/* 通常対局時だけ */}
+                        {!replayMode && (
+                            <div className="game-controls">
+                                <button 
+                                    className="resign-button" 
+                                    onClick={resign}
+                                    disabled={showUndoDialog}
+                                >
+                                    投了
+                                </button>
 
-                        <button
-                            disabled={
-                                winner !== null ||
-                                myPlayer === turn ||
-                                undoRequestPending ||
-                                undoUsedThisTurn ||
-                                showUndoDialog
-                            }
-                            onClick={() => {
-                                setUndoRequestPending(true);
-                                setUndoUsedThisTurn(true);
-                                setShowUndoWaitingDialog(true);
+                                <button
+                                    disabled={
+                                        winner !== null ||
+                                        myPlayer === turn ||
+                                        undoRequestPending ||
+                                        undoUsedThisTurn ||
+                                        showUndoDialog
+                                    }
+                                    onClick={() => {
+                                        setUndoRequestPending(true);
+                                        setUndoUsedThisTurn(true);
+                                        setShowUndoWaitingDialog(true);
 
-                                socketRef.current?.send(
-                                    JSON.stringify({
-                                        type: "undo-request",
-                                    })
-                                );
-                            }}
-                        >
-                            待った
-                        </button>
+                                        socketRef.current?.send(
+                                            JSON.stringify({
+                                                type: "undo-request",
+                                            })
+                                        );
+                                    }}
+                                >
+                                    待った
+                                </button>
+
+                                <button
+                                    disabled={winner === null || replayMode}
+                                    onClick={() => {
+                                        socketRef.current?.send(
+                                            JSON.stringify({
+                                                type: "replay-request",
+                                            })
+                                        );
+                                    }}
+                                >
+                                    棋譜再生
+                                </button>
+                            </div>
+                        )}
+
+                        {replayMode && (
+                            <div className="game-controls replay-controls">
+                                <button
+                                    onClick={() => {
+                                        setReplayMoveIndex(0);
+                                    }}
+                                >
+                                    最初
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        setReplayMoveIndex((prev) =>
+                                            Math.max(0, prev - 1)
+                                        );
+                                    }}
+                                >
+                                    ←
+                                </button>
+
+                                <span>
+                                    {replayMoveIndex} / {replayMoves.length}
+                                </span>
+
+                                <button
+                                    onClick={() => {
+                                        setReplayMoveIndex((prev) =>
+                                            Math.min(
+                                                replayMoves.length,
+                                                prev + 1
+                                            )
+                                        );
+                                    }}
+                                >
+                                    →
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        setReplayMoveIndex(
+                                            replayMoves.length
+                                        );
+                                    }}
+                                >
+                                    最後
+                                </button>
+                            </div>
+                        )}
 
                     </div>
 

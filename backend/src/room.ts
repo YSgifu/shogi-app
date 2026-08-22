@@ -280,6 +280,18 @@ export class Room {
                 return;
             }
 
+            // ===== 棋譜再生要求 =====
+            if (message.type === "replay-request") {
+                server.send(
+                    JSON.stringify({
+                        type: "replay",
+                        moves: this.moves,
+                    })
+                );
+
+                return;
+            }
+
             // ===== 既存のMove処理 =====
             const move = message as Move;
 

@@ -1,6 +1,11 @@
 import type { Board, Player, CapturedPieceType } from "@/types/shogi";
 import { getMovableSquares, canDropPiece } from "@/lib/moves";
 
+// ============================================================================
+// 王手判定
+// ============================================================================
+
+// 指定したプレイヤーが王手されているか判定
 export function isInCheck(
     board: Board,
     player: Player
@@ -59,6 +64,11 @@ export function isInCheck(
     return false;
 }
 
+// ============================================================================
+// 合法手判定
+// ============================================================================
+
+// 指定した盤上の移動が合法か判定
 export function isLegalMove(
     board: Board,
     fromRow: number,
@@ -80,6 +90,7 @@ export function isLegalMove(
     return !isInCheck(newBoard, movingPiece.player);
 }
 
+// 盤上の駒だけで合法手が存在するか判定
 function hasLegalBoardMove(
     board: Board,
     player: Player
@@ -117,6 +128,7 @@ function hasLegalBoardMove(
     return false;
 }
 
+// 持ち駒を打って合法手が存在するか判定
 function hasLegalDrop(
     board: Board,
     player: Player,
@@ -173,6 +185,12 @@ function hasLegalDrop(
     return false;
 }
 
+
+// ============================================================================
+// 詰み判定
+// ============================================================================
+
+// 指定したプレイヤーが詰んでいるか判定
 export function isCheckmate(
     board: Board,
     player: Player,
@@ -198,3 +216,12 @@ export function isCheckmate(
 
     return true;
 }
+
+
+
+
+
+
+
+
+

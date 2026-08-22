@@ -2,11 +2,20 @@ import type { Board, Hands, Player, CapturedPieceType, Move, Piece } from "@/typ
 import { createPiece } from "@/lib/piece";
 import { initialBoard, initialHands } from "@/lib/initialBoard";
 
+// ============================================================================
+// 型
+// ============================================================================
+
 export type Square = {
     row: number;
     col: number;
-    };
+};
 
+// ============================================================================
+// 駒の移動可能マス
+// ============================================================================
+
+// 指定した駒の移動可能マスを取得
 export function getMovableSquares(
     board: Board,
     row: number,
@@ -296,83 +305,8 @@ export function getMovableSquares(
     return [];
 }
 
-export function canPromote(
-    piece: Piece,
-    fromRow: number,
-    toRow: number
-): boolean {
-    // 金・王は成れない
-    if (piece.type === "KI" || piece.type === "OU") {
-        return false;
-    }
 
-    // すでに成っている駒は対象外
-    if (piece.promoted) {
-        return false;
-    }
-
-    // 先手は上方向、後手は下方向が相手陣
-    const fromInPromotionZone =
-        piece.player === "sente"
-            ? fromRow <= 2
-            : fromRow >= 6;
-
-    const toInPromotionZone =
-        piece.player === "sente"
-            ? toRow <= 2
-            : toRow >= 6;
-
-    return fromInPromotionZone || toInPromotionZone;
-}
-
-export function canDropPiece(
-    board: Board,
-    type: CapturedPieceType,
-    player: Player,
-    row: number,
-    col: number
-): boolean {
-    // 駒があるマスには打てない
-    if (board[row][col]) {
-        return false;
-    }
-
-    const lastRow = player === "sente" ? 0 : 8;
-
-    if (
-            (type === "FU" || type === "KY") &&
-            row === lastRow
-        ) {
-            return false;
-        }
-
-        const lastTwoRows =
-        player === "sente"
-            ? row <= 1
-            : row >= 7;
-
-    if (type === "KE" && lastTwoRows) {
-        return false;
-    }
-
-    if (type === "FU") {
-        for (let r = 0; r < 9; r++) {
-            const piece = board[r][col];
-
-            if (
-                piece &&
-                piece.player === player &&
-                piece.type === "FU" &&
-                !piece.promoted
-            ) {
-                return false;
-            }
-        }
-    }
-
-    return true;
-}
-
+// 金の移動可能マスを取得
 function getGoldMovableSquares(
     board: Board,
     row: number,
@@ -405,6 +339,8 @@ function getGoldMovableSquares(
     });
 }
 
+
+// 角の移動可能マスを取得
 function getBishopMovableSquares(
     board: Board,
     row: number,
@@ -456,6 +392,8 @@ function getBishopMovableSquares(
     return movableSquares;
 }
 
+
+// 飛車の移動可能マスを取得
 function getRookMovableSquares(
     board: Board,
     row: number,
@@ -507,42 +445,11 @@ function getRookMovableSquares(
     return movableSquares;
 }
 
-function getSlidingAttackSquares(
-    board: Board,
-    row: number,
-    col: number,
-    directions: Square[]
-): Square[] {
-    const attackSquares: Square[] = [];
+// ============================================================================
+// 駒の利き
+// ============================================================================
 
-    for (const direction of directions) {
-        let nextRow = row + direction.row;
-        let nextCol = col + direction.col;
-
-        while (
-            nextRow >= 0 &&
-            nextRow < 9 &&
-            nextCol >= 0 &&
-            nextCol < 9
-        ) {
-            attackSquares.push({
-                row: nextRow,
-                col: nextCol,
-            });
-
-            // 駒にぶつかったら、そのマスまでで終了
-            if (board[nextRow][nextCol]) {
-                break;
-            }
-
-            nextRow += direction.row;
-            nextCol += direction.col;
-        }
-    }
-
-    return attackSquares;
-}
-
+// 指定した駒の利きマスを取得
 export function getAttackSquares(
     board: Board,
     row: number,
@@ -780,6 +687,7 @@ export function getAttackSquares(
     return [];
 }
 
+// 金の利きマスを取得
 function getGoldAttackSquares(
     board: Board,
     row: number,
@@ -806,6 +714,132 @@ function getGoldAttackSquares(
     );
 }
 
+// 直線方向の利きマスを取得
+function getSlidingAttackSquares(
+    board: Board,
+    row: number,
+    col: number,
+    directions: Square[]
+): Square[] {
+    const attackSquares: Square[] = [];
+
+    for (const direction of directions) {
+        let nextRow = row + direction.row;
+        let nextCol = col + direction.col;
+
+        while (
+            nextRow >= 0 &&
+            nextRow < 9 &&
+            nextCol >= 0 &&
+            nextCol < 9
+        ) {
+            attackSquares.push({
+                row: nextRow,
+                col: nextCol,
+            });
+
+            // 駒にぶつかったら、そのマスまでで終了
+            if (board[nextRow][nextCol]) {
+                break;
+            }
+
+            nextRow += direction.row;
+            nextCol += direction.col;
+        }
+    }
+
+    return attackSquares;
+}
+
+// ============================================================================
+// 成り・駒打ちのルール
+// ============================================================================
+
+// 指定した移動で成れるか判定
+export function canPromote(
+    piece: Piece,
+    fromRow: number,
+    toRow: number
+): boolean {
+    // 金・王は成れない
+    if (piece.type === "KI" || piece.type === "OU") {
+        return false;
+    }
+
+    // すでに成っている駒は対象外
+    if (piece.promoted) {
+        return false;
+    }
+
+    // 先手は上方向、後手は下方向が相手陣
+    const fromInPromotionZone =
+        piece.player === "sente"
+            ? fromRow <= 2
+            : fromRow >= 6;
+
+    const toInPromotionZone =
+        piece.player === "sente"
+            ? toRow <= 2
+            : toRow >= 6;
+
+    return fromInPromotionZone || toInPromotionZone;
+}
+
+
+// 指定した場所に持ち駒を打てるか判定
+export function canDropPiece(
+    board: Board,
+    type: CapturedPieceType,
+    player: Player,
+    row: number,
+    col: number
+): boolean {
+    // 駒があるマスには打てない
+    if (board[row][col]) {
+        return false;
+    }
+
+    const lastRow = player === "sente" ? 0 : 8;
+
+    if (
+            (type === "FU" || type === "KY") &&
+            row === lastRow
+        ) {
+            return false;
+        }
+
+        const lastTwoRows =
+        player === "sente"
+            ? row <= 1
+            : row >= 7;
+
+    if (type === "KE" && lastTwoRows) {
+        return false;
+    }
+
+    if (type === "FU") {
+        for (let r = 0; r < 9; r++) {
+            const piece = board[r][col];
+
+            if (
+                piece &&
+                piece.player === player &&
+                piece.type === "FU" &&
+                !piece.promoted
+            ) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+// ============================================================================
+// ゲーム状態の変更
+// ============================================================================
+
+// Moveを盤面・持ち駒に適用
 export const applyMove = (board: Board, hands: Hands, move: Move): {
     board: Board;
     hands: Hands;
@@ -858,6 +892,8 @@ export const applyMove = (board: Board, hands: Hands, move: Move): {
     };
 };
 
+
+// 棋譜から盤面・持ち駒を再構築
 export const rebuildGameState = (
     moves: Move[]
 ): {
@@ -883,3 +919,20 @@ export const rebuildGameState = (
         hands,
     };
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

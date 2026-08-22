@@ -16,10 +16,12 @@ type Move = {
 };
 
 export class Room {
-    private clients: {
-        socket: WebSocket;
-        player: Player;
-    }[] = [];
+    private players: Record<Player, WebSocket | null> = {
+        sente: null,
+        gote: null,
+    };
+
+    private playerChooser: Player | null = null;
 
     private turn: Player = "sente";
 
@@ -31,18 +33,16 @@ export class Room {
 
     async fetch(request: Request): Promise<Response> {
 
-        // ===== 切断済みのクライアントを削除 =====
-        this.clients = this.clients.filter(
-            (client) => client.socket.readyState === WebSocket.OPEN
-        );
-
         if (request.headers.get("Upgrade") !== "websocket") {
             return new Response("WebSocket connection required", {
                 status: 426,
             });
         }
 
-        if (this.clients.length >= 2) {
+        if (
+            this.players.sente !== null &&
+            this.players.gote !== null
+        ) {
             return new Response("Room is full", {
                 status: 403,
             });
@@ -53,19 +53,20 @@ export class Room {
         const server = pair[1];
 
         const player: Player =
-            this.clients.length === 0
+            this.players.sente === null
                 ? "sente"
                 : "gote";
 
         server.accept();
 
-        const isFirstPlayer = this.clients.length === 0;
+        this.players[player] = server;
 
-        this.clients.push({
-            socket: server,
-            player,
-        });
+        const isFirstPlayer =
+            this.playerChooser === null;
 
+        if (this.playerChooser === null) {
+            this.playerChooser = player;
+        }
 
         server.send(
             JSON.stringify({
@@ -74,12 +75,46 @@ export class Room {
             })
         );
 
-        if (this.clients.length === 2) {
+        if (this.selectedPlayer !== null) {
+            server.send(
+                JSON.stringify({
+                    type: "player-assigned",
+                    player,
+                })
+            );
 
-            for (const client of this.clients) {
-                console.log("送信対象:", client.player);
+            // ===== 現在の対局状態を再接続者へ送信 =====
+            server.send(
+                JSON.stringify({
+                    type: "game-state",
+                    moves: this.moves,
+                    turn: this.turn,
+                })
+            );
+        }
 
-                client.socket.send(
+        // ===== 相手へ復帰を通知 =====
+        const opponent: Player =
+            player === "sente"
+                ? "gote"
+                : "sente";
+
+        const opponentSocket = this.players[opponent];
+
+        if (opponentSocket?.readyState === WebSocket.OPEN) {
+            opponentSocket.send(
+                JSON.stringify({
+                    type: "opponent-reconnected",
+                })
+            );
+        }
+
+        if (
+            this.players.sente !== null &&
+            this.players.gote !== null
+        ) {
+            for (const socket of Object.values(this.players)) {
+                socket?.send(
                     JSON.stringify({
                         type: "opponent-joined",
                     })
@@ -92,67 +127,86 @@ export class Room {
             const message = JSON.parse(event.data);
 
             if (message.type === "player-choice") {
-                // ===== 1人目の選択を保存 =====
-                this.selectedPlayer = message.player;
-
-
-                // ===== 2人目がまだいない場合はここで終了 =====
-                if (this.clients.length < 2) {
+                // ===== 手番選択権を持つプレイヤーか確認 =====
+                if (this.playerChooser === null) {
                     return;
                 }
 
-                // ===== 2人目は反対の手番 =====
+                if (this.players[this.playerChooser] !== server) {
+                    return;
+                }
+
+                // ===== 選択した手番を保存 =====
+                const selectedPlayer = message.player as Player;
+                this.selectedPlayer = selectedPlayer;
+
+                // ===== 2人揃っていなければ選択できない =====
+                if (
+                    this.players.sente === null ||
+                    this.players.gote === null
+                ) {
+                    return;
+                }
+
+                // ===== 手番選択したプレイヤー =====
+                const chooserPlayer = this.playerChooser;
+
+                // ===== 相手の手番 =====
                 const opponentPlayer: Player =
                     this.selectedPlayer === "sente"
                         ? "gote"
                         : "sente";
 
-                // ===== Room内部の先後を更新 =====
-                this.clients[0].player = this.selectedPlayer!;
-                this.clients[1].player = opponentPlayer;
+                // ===== 現在のSocketを取得 =====
+                const chooserSocket = this.players[chooserPlayer];
+                const opponentSocket = this.players[opponentPlayer];
+
+                if (!chooserSocket || !opponentSocket) {
+                    return;
+                }
+
+                // ===== 手番を入れ替える場合 =====
+                if (chooserPlayer !== this.selectedPlayer) {
+                    this.players[chooserPlayer] = opponentSocket;
+                    this.players[opponentPlayer] = chooserSocket;
+                }
+
 
                 // ===== 先後を両者へ通知 =====
-                const firstClient = this.clients[0];
-                const secondClient = this.clients[1];
-
-                firstClient.socket.send(
+                this.players[selectedPlayer]?.send(
                     JSON.stringify({
                         type: "player-assigned",
-                        player: this.selectedPlayer,
+                        player: selectedPlayer,
                     })
                 );
 
-                secondClient.socket.send(
+                this.players[opponentPlayer]?.send(
                     JSON.stringify({
                         type: "player-assigned",
                         player: opponentPlayer,
                     })
                 );
 
+                // ===== 手番選択権を解除 =====
+                this.playerChooser = null;
+
                 return;
             }
 
+            // ===== 待った要求 =====
             if (message.type === "undo-request") {
                 if (this.undoRequester !== null) {
                     return;
                 }
-                const client = this.clients.find(
-                    (client) => client.socket === server
-                );
 
-                if (!client) return;
+                // ===== このSocketのプレイヤーを特定 =====
+                const player = (
+                    Object.entries(this.players) as [Player, WebSocket | null][]
+                ).find(
+                    ([, socket]) => socket === server
+                )?.[0];
 
-                // ===== すでに待った要求中 =====
-                if (this.undoRequester !== null) {
-                    server.send(
-                        JSON.stringify({
-                            type: "undo-error",
-                            reason: "すでに待ったを要求しています",
-                        })
-                    );
-
-                    return;
-                }
+                if (!player) return;
 
                 // ===== まだ一手も指されていない =====
                 if (this.moves.length === 0) {
@@ -168,7 +222,7 @@ export class Room {
 
                 // ===== 自分の手番中 =====
                 if (
-                    this.moves[this.moves.length - 1].player !== client.player
+                    this.moves[this.moves.length - 1].player !== player
                 ) {
                     server.send(
                         JSON.stringify({
@@ -181,21 +235,25 @@ export class Room {
                 }
 
                 // ===== 待った要求を保存 =====
-                this.undoRequester = client.player;
+                this.undoRequester = player;
+
+                // ===== 相手を特定 =====
+                const opponent: Player =
+                    player === "sente"
+                        ? "gote"
+                        : "sente";
+
+                const opponentSocket =
+                    this.players[opponent];
 
                 // ===== 相手へ通知 =====
-                for (const opponent of this.clients) {
-                    if (
-                        opponent.socket !== server &&
-                        opponent.socket.readyState === WebSocket.OPEN
-                    ) {
-                        opponent.socket.send(
-                            JSON.stringify({
-                                type: "undo-request",
-                                player: client.player,
-                            })
-                        );
-                    }
+                if (opponentSocket?.readyState === WebSocket.OPEN) {
+                    opponentSocket.send(
+                        JSON.stringify({
+                            type: "undo-request",
+                            player,
+                        })
+                    );
                 }
 
                 return;
@@ -203,22 +261,21 @@ export class Room {
 
             // ===== 待ったの承認・拒否 =====
             if (message.type === "undo-response") {
-                const requester = this.clients.find(
-                    (client) => client.player === message.player
-                );
+                const requesterPlayer = message.player as Player;
+                const requesterSocket =
+                    this.players[requesterPlayer];
 
-                if (!requester) return;
+                if (!requesterSocket) return;
 
                 // ===== 拒否 =====
                 if (!message.accepted) {
-                    requester.socket.send(
+                    requesterSocket.send(
                         JSON.stringify({
                             type: "undo-response",
                             accepted: false,
                         })
                     );
 
-                    // 待った要求を解除
                     this.undoRequester = null;
 
                     return;
@@ -239,9 +296,9 @@ export class Room {
                 this.undoRequester = null;
 
                 // 両者へ通知
-                for (const client of this.clients) {
-                    if (client.socket.readyState === WebSocket.OPEN) {
-                        client.socket.send(
+                for (const socket of Object.values(this.players)) {
+                    if (socket?.readyState === WebSocket.OPEN) {
+                        socket.send(
                             JSON.stringify({
                                 type: "undo",
                                 accepted: true,
@@ -257,24 +314,29 @@ export class Room {
 
             // ===== 投了処理 =====
             if (message.type === "resign") {
-                const client = this.clients.find(
-                    (client) => client.socket === server
-                );
+                const player = (
+                    Object.entries(this.players) as [Player, WebSocket | null][]
+                ).find(
+                    ([, socket]) => socket === server
+                )?.[0];
 
-                if (!client) return;
+                if (!player) return;
 
-                for (const opponent of this.clients) {
-                    if (
-                        opponent.socket !== server &&
-                        opponent.socket.readyState === WebSocket.OPEN
-                    ) {
-                        opponent.socket.send(
-                            JSON.stringify({
-                                type: "resign",
-                                player: client.player,
-                            })
-                        );
-                    }
+                const opponent: Player =
+                    player === "sente"
+                        ? "gote"
+                        : "sente";
+
+                const opponentSocket =
+                    this.players[opponent];
+
+                if (opponentSocket?.readyState === WebSocket.OPEN) {
+                    opponentSocket.send(
+                        JSON.stringify({
+                            type: "resign",
+                            player,
+                        })
+                    );
                 }
 
                 return;
@@ -295,17 +357,24 @@ export class Room {
             // ===== 既存のMove処理 =====
             const move = message as Move;
 
-            const client = this.clients.find(
-                (client) => client.socket === server
-            );
+            const player = (
+                Object.entries(this.players) as [Player, WebSocket | null][]
+            ).find(
+                ([, socket]) => socket === server
+            )?.[0];
 
-            if (!client) return;
+            if (!player) return;
 
-            if (move.player !== client.player) return;
+            // ===== 自分のPlayerと一致しているか確認 =====
+            if (move.player !== player) return;
+
+            // ===== 現在の手番と一致しているか確認 =====
             if (move.player !== this.turn) return;
 
+            // ===== Moveを保存 =====
             this.moves.push(move);
 
+            // ===== ターンを変更 =====
             this.turn =
                 this.turn === "sente"
                     ? "gote"
@@ -317,13 +386,17 @@ export class Room {
                 turn: this.turn,
             });
 
-            for (const client of this.clients) {
-                if (
-                    client.socket !== server &&
-                    client.socket.readyState === WebSocket.OPEN
-                ) {
-                    client.socket.send(moveMessage);
-                }
+            // ===== 相手へMoveを通知 =====
+            const opponent: Player =
+                player === "sente"
+                    ? "gote"
+                    : "sente";
+
+            const opponentSocket =
+                this.players[opponent];
+
+            if (opponentSocket?.readyState === WebSocket.OPEN) {
+                opponentSocket.send(moveMessage);
             }
 
             // ===== 自分にはターン変更だけ通知 =====
@@ -336,19 +409,65 @@ export class Room {
         });
 
         server.addEventListener("close", () => {
-            this.clients = this.clients.filter(
-                (client) => client.socket !== server
-            );
+            // ===== 切断したプレイヤーを特定 =====
+            const player = (
+                Object.entries(this.players) as [Player, WebSocket | null][]
+            ).find(
+                ([, socket]) => socket === server
+            )?.[0];
 
-            // 残っている相手に切断を通知
-            for (const client of this.clients) {
-                if (client.socket.readyState === WebSocket.OPEN) {
-                    client.socket.send(
+            if (!player) return;
+
+            // ===== プレイヤーのSocketを解放 =====
+            this.players[player] = null;
+
+            // ===== 手番選択権を持っていた場合、相手へ移す =====
+            if (this.playerChooser === player) {
+                const opponent: Player =
+                    player === "sente"
+                        ? "gote"
+                        : "sente";
+
+                this.playerChooser =
+                    this.players[opponent] !== null
+                        ? opponent
+                        : null;
+
+                if (this.players[opponent]) {
+                    this.players[opponent]?.send(
                         JSON.stringify({
-                            type: "opponent-disconnected",
+                            type: "player-choice-available",
                         })
                     );
                 }
+            }
+
+            // ===== 相手が残っている場合は切断を通知 =====
+            const opponent: Player =
+                player === "sente"
+                    ? "gote"
+                    : "sente";
+
+            const opponentSocket = this.players[opponent];
+
+            if (opponentSocket?.readyState === WebSocket.OPEN) {
+                opponentSocket.send(
+                    JSON.stringify({
+                        type: "opponent-disconnected",
+                    })
+                );
+            }
+
+            // ===== 両者とも退出したらRoomをリセット =====
+            if (
+                this.players.sente === null &&
+                this.players.gote === null
+            ) {
+                this.playerChooser = null;
+                this.selectedPlayer = null;
+                this.turn = "sente";
+                this.moves = [];
+                this.undoRequester = null;
             }
         });
 

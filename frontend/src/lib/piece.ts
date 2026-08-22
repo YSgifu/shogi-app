@@ -1,5 +1,10 @@
 import type { Piece, PieceType, Player } from "@/types/shogi";
 
+// ============================================================================
+// 駒の表示名
+// ============================================================================
+
+// 通常の駒の表示名
 export const pieceNames: Record<PieceType, string> = {
     FU: "歩",
     KY: "香",
@@ -11,6 +16,7 @@ export const pieceNames: Record<PieceType, string> = {
     OU: "王",
 };
 
+// 成り駒の表示名
 export const promotedPieceNames: Partial<Record<PieceType, string>> = {
     FU: "と",
     KY: "杏",
@@ -20,8 +26,15 @@ export const promotedPieceNames: Partial<Record<PieceType, string>> = {
     HI: "龍",
 };
 
+
+// ============================================================================
+// 駒の生成
+// ============================================================================
+
+// 駒ID生成用カウンタ
 let nextPieceId = Date.now();
 
+// 駒を生成
 export const createPiece = (
     type: PieceType,
     player: Player
@@ -31,3 +44,10 @@ export const createPiece = (
     player,
     promoted: false,
 });
+
+
+
+
+
+
+

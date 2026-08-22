@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Board, Hands, Player, CapturedPieceType, PieceType, Move } from "@/types/shogi";
-import { pieceNames, promotedPieceNames, createPiece } from "@/lib/piece";
 import { getMovableSquares, canPromote, canDropPiece, getAttackSquares, applyMove, rebuildGameState } from "@/lib/moves";
 import { isInCheck, isLegalMove, isCheckmate } from "@/lib/check";
+import Hand from "@/components/Hand";
+import ShogiBoard from "@/components/Board";
 
 
 export default function OnlineBoard({
@@ -14,94 +15,145 @@ export default function OnlineBoard({
     board: Board;
     roomId: string;
 }) {
-    const socketRef = useRef<WebSocket | null>(null);
-
+    // ===========================================================================================================================
 
     // ==================================================================================================
+    // WebSocket・同期用Ref
+    // ==================================================================================================
 
+    const socketRef = useRef<WebSocket | null>(null);
+
+    // ==================================================================================================
+    // 対局の基本状態
+    // ==================================================================================================
 
     // 現在の盤面
     const [currentBoard, setCurrentBoard] = useState(board);
-    // このブラウザのプレイヤーの手番
-    const [myPlayer, setMyPlayer] = useState<Player | null>(null);
-    // 対戦相手の手番
-    const opponent =
-        myPlayer === null
-            ? null
-            : myPlayer === "sente"
-                ? "gote"
-                : "sente";
-    // 現在のターン
-    const [turn, setTurn] = useState<Player>("sente");
     // 持ち駒管理用
     const [hands, setHands] = useState<Hands>({
         sente: {FU: 0, KY: 0, KE: 0, GI: 0, KI: 0, KA: 0, HI: 0,},
         gote: {FU: 0, KY: 0, KE: 0, GI: 0, KI: 0, KA: 0, HI: 0,},
     });
-    // 駒移動選択中のマスの情報？
-    const [selectedSquare, setSelectedSquare] = useState<{row: number; col: number;} | null>(null);
+    // このブラウザのプレイヤーの手番
+    const [myPlayer, setMyPlayer] = useState<Player | null>(null);
+    // 現在のターン
+    const [turn, setTurn] = useState<Player>("sente");
+    // 相手プレイヤー
+    function getOpponent(player: Player): Player {
+        return player === "sente" ? "gote" : "sente";
+    }
+    const opponent = myPlayer ? getOpponent(myPlayer) : null;
+    // 自分の手番かどうか
+    const isMyTurn = myPlayer !== null && myPlayer === turn;
+
+    // ==================================================================================================
+    // 盤上の選択・仮移動状態
+    // ==================================================================================================
+    // 駒移動選択中のマスの情報
+    const [selectedSquare, setSelectedSquare] = useState<{ row: number; col: number;} | null>(null);
     // 移動可能範囲を表示しているマス
-    const [movableSquares, setMovableSquares] = useState<
-        { row: number; col: number }[]
-    >([]);
+    const [movableSquares, setMovableSquares] = useState<{ row: number; col: number }[]>([]);
+
     // 仮移動後の盤面
     const [previewBoard, setPreviewBoard] = useState<Board | null>(null);
     // 仮移動モード中の持ち駒
-    const [previewHands, setPreviewHands] =
-        useState<Hands | null>(null);
+    const [previewHands, setPreviewHands] = useState<Hands | null>(null);
     // 仮移動の時のmoveを保存する用
     const [previewMove, setPreviewMove] = useState<Move | null>(null);
     // 仮移動後に成れるかを保存する用
     const [canPromotePreview, setCanPromotePreview] = useState(false);
-    // メッセージ表示用
-    const [message, setMessage] = useState<string | null>(null);
+
     // 選択した持ち駒用
-    const [selectedHandPiece, setSelectedHandPiece] =
-        useState<{
-            type: CapturedPieceType;
-            player: Player;
-        } | null>(null);
+    const [selectedHandPiece, setSelectedHandPiece] = useState<{ type: CapturedPieceType; player: Player;} | null>(null);
+
+    // ==================================================================================================
+    // 対局状態
+    // ==================================================================================================
     // 勝者用
     const [winner, setWinner] = useState<Player | null>(null);
-    // 自分のターンか否か
-    const isMyTurn = myPlayer !== null && myPlayer === turn;
+    // メッセージ表示用
+    const [message, setMessage] = useState<string | null>(null);
+    const [checkmatePlayer, setCheckmatePlayer] = useState<Player | null>(null);
+    const [showCheckmateDialog, setShowCheckmateDialog] = useState(false);
+    const [connectionStatus, setConnectionStatus] = useState<
+        "connecting"
+        | "waiting-opponent"
+        | "connected"
+        | "opponent-disconnected"
+    >("connecting");
+
+    // ==================================================================================================
+    // 対戦相手・待った関連
+    // ==================================================================================================
+    
     // 仮の「自分が1人目か」を追加
     const [isFirstPlayer, setIsFirstPlayer] = useState(false);
-    const [isAttackMode, setIsAttackMode] = useState(false);
-    const [attackPieces, setAttackPieces] = useState<number[]>([]);
-
-    const [checkmatePlayer, setCheckmatePlayer] =
-    useState<Player | null>(null);
-
-    const [showCheckmateDialog, setShowCheckmateDialog] = useState(false);
-    const [showWinAnimation, setShowWinAnimation] = useState(false);
-
     const [opponentJoined, setOpponentJoined] = useState(false);
+
     const [showUndoDialog, setShowUndoDialog] = useState(false);
     const [undoRequester, setUndoRequester] = useState<Player | null>(null);
     const [undoRequestPending, setUndoRequestPending] = useState(false);
     const [undoUsedThisTurn, setUndoUsedThisTurn] = useState(false);
     const [showUndoWaitingDialog, setShowUndoWaitingDialog] = useState(false);
 
+    // ==================================================================================================
+    // 利き表示関連
+    // ==================================================================================================
+
+    const [isAttackMode, setIsAttackMode] = useState(false);
+    const [attackPieces, setAttackPieces] = useState<number[]>([]);
+
+    // ==================================================================================================
+    // 棋譜再生関連
+    // ==================================================================================================
+    
     const [replayMode, setReplayMode] = useState(false);
     const [replayMoveIndex, setReplayMoveIndex] = useState(0);
     const [replayMoves, setReplayMoves] = useState<Move[]>([]);
-    
+
+    // ==================================================================================================
+    // 同期用Ref
+    // ==================================================================================================
+
+    const boardRef = useRef<Board>(currentBoard);
+    const handsRef = useRef<Hands>(hands);
+    const myPlayerRef = useRef<Player | null>(myPlayer);
+    const moveSoundRef = useRef<HTMLAudioElement | null>(null);
+
+    // ==================================================================================================
+    // 追加分
+    // ==================================================================================================
+
+    const isDialogOpen =
+        connectionStatus !== "connected" ||
+        myPlayer === null ||
+        showUndoDialog ||
+        showUndoWaitingDialog;
+
+    const [resignedPlayer, setResignedPlayer] = useState<Player | null>(null);
+
+    // ==================================================================================================
+    // 表示用の派生データ
+    // ==================================================================================================
+
+    // 棋譜再生時点の盤面・持ち駒
     const replayResult = rebuildGameState(
         replayMoves.slice(0, replayMoveIndex)
     );
 
+    // 現在操作対象となる盤面
     const boardForInteraction =
         replayMode
             ? replayResult.board
             : previewBoard ?? currentBoard;
 
+    // 実際に表示する盤面
     const boardToDisplay =
         replayMode
             ? replayResult?.board ?? currentBoard
             : previewBoard ?? currentBoard;
 
-    // 仮移動後・棋譜再生中のプレイヤーに見せる盤面
+    // プレイヤーの向きに合わせた表示用盤面
     const displayBoard =
         myPlayer === "gote"
             ? [...boardToDisplay]
@@ -109,22 +161,13 @@ export default function OnlineBoard({
                 .map((row) => [...row].reverse())
         : boardToDisplay;
 
-    const handsToDisplay =
+    // 実際に表示する持ち駒
+    const displayHands =
         replayMode
             ? replayResult.hands
             : previewHands ?? hands;
 
-    const displayHands = handsToDisplay;
-    
-    
-
-
-    const boardRef = useRef<Board>(currentBoard);
-    const handsRef = useRef<Hands>(hands);
-    const myPlayerRef = useRef<Player | null>(myPlayer);
-    const moveSoundRef = useRef<HTMLAudioElement | null>(null);
-
-
+    // 持ち駒を打てるマス
     const dropSquares =
         selectedHandPiece
             ? currentBoard.flatMap((row, rowIndex) =>
@@ -146,9 +189,10 @@ export default function OnlineBoard({
             : [];
 
     
-    // 利き表示 
+    // 利き表示の対象となる盤面
     const attackBoard = boardForInteraction;
 
+    // 利き表示中のマス
     const attackSquares = attackPieces.flatMap((pieceId) => {
         const position = attackBoard
             .flatMap((row, rowIndex) =>
@@ -169,9 +213,12 @@ export default function OnlineBoard({
         );
     });
 
+    // ==================================================================================================
+    // 対局終了処理
+    // ==================================================================================================
+
     const finishGame = (winner: Player) => {
         setWinner(winner);
-        setShowWinAnimation(true);
 
         // 待った関連をすべて解除
         setShowUndoDialog(false);
@@ -182,42 +229,51 @@ export default function OnlineBoard({
 
 
     // ==================================================================================================
+    // Refの同期・初期化
+    // ==================================================================================================
 
-
-
+    // 盤面Refを同期
     useEffect(() => {
         boardRef.current = currentBoard;
     }, [currentBoard]);
 
+    // 持ち駒Refを同期
     useEffect(() => {
         handsRef.current = hands;
     }, [hands]);
 
-    // useEffect(() => {
-    //     console.log("hands state更新:", hands);
-    // }, [hands]);
 
+    // プレイヤーRefを同期
     useEffect(() => {
         myPlayerRef.current = myPlayer;
     }, [myPlayer]);
 
+    // 駒音を初期化
     useEffect(() => {
         moveSoundRef.current =
             new Audio("/sounds/japanese-chess-piece1.mp3");
     }, []);
 
 
+    // ===========================================================================================================================
+
+    // ==================================================================================================
+    // WebSocket通信
     // ==================================================================================================
 
-    // ===== WebSocket接続・サーバーからのMove受信処理、自分の盤面に反映 =====
+    // WebSocket接続・サーバーからのメッセージ受信
     useEffect(() => {
-        const wsUrl = "wss://backend.asahi-dev.workers.dev";
+        // const wsUrl = "wss://backend.asahi-dev.workers.dev";
 
-        // const wsUrl = "ws://127.0.0.1:8787"
+        const wsUrl = "ws://127.0.0.1:8787"
 
         const socket = new WebSocket(
             `${wsUrl}/api/rooms/${roomId}/ws`
         );
+
+        socket.onopen = () => {
+            setConnectionStatus("waiting-opponent");
+        };
 
         socketRef.current = socket;
 
@@ -229,13 +285,29 @@ export default function OnlineBoard({
                 return;
             }
 
+            if (message.type === "player-choice-available") {
+                setIsFirstPlayer(true);
+                return;
+            }
+
             if (message.type === "opponent-joined") {
                 setOpponentJoined(true);
+                setConnectionStatus("connected");
                 return;
             }
 
             if (message.type === "player-assigned") {
                 setMyPlayer(message.player);
+                return;
+            }
+
+            if (message.type === "game-state") {
+                const result = rebuildGameState(message.moves);
+
+                setCurrentBoard(result.board);
+                setHands(result.hands);
+                setTurn(message.turn);
+
                 return;
             }
 
@@ -245,6 +317,8 @@ export default function OnlineBoard({
             }
 
             if (message.type === "resign") {
+                setResignedPlayer(message.player);
+
                 finishGame(
                     message.player === "sente"
                         ? "gote"
@@ -254,7 +328,12 @@ export default function OnlineBoard({
             }
 
             if (message.type === "opponent-disconnected") {
-                setMessage("相手との接続が切れました");
+                setConnectionStatus("opponent-disconnected");
+                return;
+            }
+
+            if (message.type === "opponent-reconnected") {
+                setConnectionStatus("connected");
                 return;
             }
 
@@ -269,7 +348,7 @@ export default function OnlineBoard({
                 setShowUndoWaitingDialog(false);
 
                 if (!message.accepted) {
-                    setMessage("待ったが拒否されました");
+                    setMessage("待ったが\n拒否されました");
                 }
 
                 return;
@@ -286,42 +365,27 @@ export default function OnlineBoard({
                     message.moves
                 );
 
-                // ===== 待ったが承認されたことを表示 =====
-                setMessage("待ったが承認されました");
-
-                // ===== 正式な盤面・持ち駒に戻す =====
+                // 待った承認後のゲーム状態を復元
+                setMessage("待ったが\n承認されました");
                 setCurrentBoard(result.board);
                 setHands(result.hands);
 
-                // ===== 仮移動状態を解除 =====
+                // 操作状態をリセット
                 setPreviewBoard(null);
                 setPreviewMove(null);
                 setPreviewHands(null);
-
-                // ===== 盤上の選択状態を解除 =====
                 setSelectedSquare(null);
                 setMovableSquares([]);
-
-                // ===== 持ち駒の選択状態を解除 =====
                 setSelectedHandPiece(null);
-
-                // ===== 成り選択状態を解除 =====
                 setCanPromotePreview(false);
-
-                // ===== 利き表示を解除 =====
                 setAttackPieces([]);
 
-                // ===== 待ったダイアログを解除 =====
+                // ダイアログ・対局状態をリセット
                 setShowUndoDialog(false);
                 setUndoRequester(null);
-
-                // ===== 詰み関連を解除 =====
                 setShowCheckmateDialog(false);
                 setCheckmatePlayer(null);
-
-                // ===== 待った要求中を解除 =====
                 setUndoRequestPending(false);
-
                 setShowUndoWaitingDialog(false);
 
                 // ===== ターンを更新 =====
@@ -395,11 +459,8 @@ export default function OnlineBoard({
             player,
         };
 
-        // console.log("先後選択:", message);
-
         socketRef.current?.send(JSON.stringify(message));
     };
-
 
     // ===== Moveをサーバーへ送信し、自分の盤面にも反映する処理 =====
     const sendMove = (
@@ -411,6 +472,7 @@ export default function OnlineBoard({
     ) => {
         if (!myPlayer) return;
 
+        // Moveを作成
         const move: Move = {
             type: "move",
             player: myPlayer,
@@ -421,27 +483,34 @@ export default function OnlineBoard({
             capturedPieceType,
         };
 
+        // Moveを適用
         const result = applyMove(
             currentBoard,
             hands,
             move
         );
 
-        // ===== 王手判定 =====
-        const opponent =
-            myPlayer === "sente"
-                ? "gote"
-                : "sente";
+        const opponent = getOpponent(myPlayer);
 
-        if (isInCheck(result.board, opponent)) {
+        if (
+            isCheckmate(
+                result.board,
+                opponent,
+                result.hands
+            )
+        ) {
+            finishGame(myPlayer);
+        } else if (
+            isInCheck(result.board, opponent)
+        ) {
             setMessage("王手！");
         }
 
-
+        // 盤面・持ち駒を更新
         setCurrentBoard(result.board);
         setHands(result.hands);
 
-        // 🔊 駒音
+        // 駒音を再生
         const sound = moveSoundRef.current;
 
         if (sound) {
@@ -449,12 +518,13 @@ export default function OnlineBoard({
             sound.play();
         }
 
+        // サーバーへMoveを送信
         socketRef.current?.send(JSON.stringify(move));
 
-        // ===== 待った使用制限を解除 =====
+        // 待ったの使用状態をリセット
         setUndoUsedThisTurn(false);
 
-        // ===== 仮移動状態を解除して通常モードへ戻る =====
+        // 仮移動状態をリセット
         setPreviewBoard(null);
         setPreviewMove(null);
         setPreviewHands(null);
@@ -462,9 +532,11 @@ export default function OnlineBoard({
         setMovableSquares([]);
     };
 
-    // ==================================================================================================
+    // ===========================================================================================================================
 
-    // 盤上の駒を選択する共通処理
+    // ===== 盤上選択の共通処理 =====
+
+    // 盤上の駒を選択する
     function selectSquare(rowIndex: number, colIndex: number) {
         if (winner) return;
 
@@ -482,7 +554,7 @@ export default function OnlineBoard({
         );
     }
 
-    // 盤上の駒の選択を解除する共通処理
+    // 盤上の駒の選択を解除する
     function clearSquareSelection() {
         setSelectedSquare(null);
         setMovableSquares([]);
@@ -501,12 +573,11 @@ export default function OnlineBoard({
 
     // 選択状態のクリック時処理
     function handleSelectedClick(rowIndex: number, colIndex: number) {
-        // ===== クリックしたマスの駒を取得 =====
         const piece = currentBoard[rowIndex][colIndex];
 
-        // ===== 自分の別の駒をクリックした場合、選択を切り替える =====
+        // 自分の別の駒をクリックした場合、選択を切り替える
         if (piece && piece.player === myPlayer) {
-            // 現在選択している駒をもう一度クリックした場合
+            // 選択中の駒をもう一度クリックした場合、選択を解除する
             if (
                 selectedSquare?.row === rowIndex &&
                 selectedSquare?.col === colIndex
@@ -520,32 +591,30 @@ export default function OnlineBoard({
             return;
         }
 
-        // 移動可能マス
+        // 移動可能マスか判定する
         const isMovable = movableSquares.some(
             (square) =>
                 square.row === rowIndex &&
                 square.col === colIndex
         );
 
-        // これを通過できるなら移動可能マスをクリックしたということ
-        // 仮移動モードへ移行
         if (!isMovable) return;
 
-        previewMode(rowIndex, colIndex);
+        // 移動可能マスをクリックしたら仮移動する
+        createPreviewMove(rowIndex, colIndex);
     }
 
-    // ===== 仮移動モード =====
-    function previewMode(rowIndex: number, colIndex: number) {
-        // ===================仮移動モードへの移行準備===================
+    // 仮移動処理
+    function createPreviewMove(rowIndex: number, colIndex: number) {
         if (!selectedSquare) return;
 
-        // ===== 移動元の駒を取得 =====
+        // 移動元の駒を取得する
         const movingPiece =
             currentBoard[selectedSquare.row][selectedSquare.col];
 
         if (!movingPiece) return;
 
-        // ===== 実際にその手が合法か判定 =====
+        // 移動が合法か判定する
         const isLegal = isLegalMove(
             currentBoard,
             selectedSquare.row,
@@ -559,7 +628,7 @@ export default function OnlineBoard({
             return;
         }
 
-        // ===== 成れるか判定 =====
+        // 成れるか判定する
         const canPromoteMove = canPromote(
             movingPiece,
             selectedSquare.row,
@@ -568,7 +637,7 @@ export default function OnlineBoard({
 
         setCanPromotePreview(canPromoteMove);
 
-        // ===== 移動先の駒を取得 =====
+        // 移動先の駒を取得する
         const capturedPiece =
             currentBoard[rowIndex][colIndex];
 
@@ -577,7 +646,7 @@ export default function OnlineBoard({
                 ? undefined
                 : capturedPiece?.type;
 
-        // ===== 仮移動するMoveを作成 =====
+        // 仮移動するMoveを作成する
         const move: Move = {
             type: "move",
             player: movingPiece.player,
@@ -590,37 +659,34 @@ export default function OnlineBoard({
             capturedPieceType,
         };
 
-        // ===== 仮移動するMoveを保存 =====
         setPreviewMove(move);
 
-        // ===== Moveを適用して仮盤面を作成 =====
+        // Moveを適用して仮盤面・仮持ち駒を作成する
         const result = applyMove(
             currentBoard,
             hands,
             move
         );
 
-        // ===== 仮盤面を設定 =====
         setPreviewBoard(result.board);
-
-        // ===== 仮持ち駒を設定 =====
         setPreviewHands(result.hands);
 
-        // ===== 選択位置を仮移動後の位置に変更 =====
+        // 選択位置を仮移動後の位置に変更する
         setSelectedSquare({
             row: rowIndex,
             col: colIndex,
         });
 
-        // ===== 移動可能範囲の表示を解除 =====
+        // 移動可能範囲の表示を解除する
         setMovableSquares([]);
     }
 
-    // 合体！ 
+    // 盤面をクリックしたときの処理をまとめる
     function handleSquareClick(rowIndex: number, colIndex: number) {
+        // 待ったダイアログ表示中は操作しない
         if (showUndoDialog) return;
 
-        // ===== 利き表示モード =====
+        // 利き表示モード
         if (isAttackMode) {
             const piece = boardForInteraction[rowIndex][colIndex];
 
@@ -642,19 +708,20 @@ export default function OnlineBoard({
             return;
         }
 
-        // ===== リプレイ中は通常操作禁止 =====
+        // リプレイ中は通常操作しない
         if (replayMode) return;
 
-        // ===== 対局終了後は操作禁止 =====
+        // 対局終了後は操作しない
         if (winner) return;
 
-        // ===== 仮移動中 =====
+        // 仮移動中
         if (previewMove !== null) {
-            // 成り選択中は、駒をもう一度クリックしても確定しない
+            // 成り選択中は盤面クリックでは確定しない
             if (canPromotePreview) {
                 return;
             }
-            // もう一度クリックしたら確定
+
+            // 仮移動先をもう一度クリックしたら確定する
             if (
                 previewMove.to.row === rowIndex &&
                 previewMove.to.col === colIndex
@@ -666,47 +733,36 @@ export default function OnlineBoard({
         }
 
 
-        // ===== 持ち駒選択中 =====
+        // 持ち駒選択中
         if (selectedHandPiece) {
             handleHandPieceSquareClick(rowIndex, colIndex);
             return;
         }
 
-        // 通常状態
+        // 駒を選択していない場合
         if (!selectedSquare) {
             handleNormalClick(rowIndex, colIndex);
             return;
         }
 
-        // 選択状態
+        // 駒を選択している場合
         handleSelectedClick(rowIndex, colIndex);
     }
 
-    // ==================================================================================================
+    // ===========================================================================================================================
 
     // 持ち駒クリック処理
 
-    // ===== 持ち駒選択 =====
+    // ===== 持ち駒の選択・選択解除 =====
     function handleHandPieceClick(
         type: CapturedPieceType,
         player: Player
     ) {
-        // ===== 利き表示モード中は持ち駒を選択できない =====
         if (isAttackMode) return;
-        
-        // ===== 仮移動中は持ち駒を選択できない =====
         if (previewMove !== null) return;
-
-        // ===== 勝敗が決まっていたら選択できない =====
         if (winner) return;
-
-        // ===== 待った承認・拒否中は選択できない =====
         if (showUndoDialog) return;
-
-        // ===== 自分の手番ではない場合は選択できない =====
         if (myPlayer !== turn) return;
-
-        // ===== 自分の手番ではない持ち駒は選択できない =====
         if (player !== myPlayer) return;
 
         // ===== 選択中の持ち駒をもう一度クリックしたら選択解除 =====
@@ -728,7 +784,7 @@ export default function OnlineBoard({
         });
     }
 
-    // ===== 持ち駒選択中の盤面クリック処理 =====
+    // ===== 選択中の持ち駒を盤面に打つ処理 =====
     function handleHandPieceSquareClick(
         rowIndex: number,
         colIndex: number
@@ -755,7 +811,7 @@ export default function OnlineBoard({
         );
 
         if (!canDrop) {
-            setMessage("その場所には打てません");
+            setMessage("その場所には\n打てません");
             return;
         }
 
@@ -789,7 +845,7 @@ export default function OnlineBoard({
         setSelectedHandPiece(null);
     }
 
-    // 盤面外クリック処理
+    // ===== 盤面・持ち駒以外をクリックしたときの選択解除 =====
     useEffect(() => {
         function handleOutsideClick(event: MouseEvent) {
             const target = event.target as HTMLElement;
@@ -813,6 +869,8 @@ export default function OnlineBoard({
     }, [previewBoard]);
 
     // ==================================================================================================
+
+    // ===== 利き表示 =====
 
     // ===== 指定したプレイヤーの全駒の利きを表示 =====
     function showAllAttackPieces(player: Player) {
@@ -921,6 +979,7 @@ export default function OnlineBoard({
             })
         );
 
+        setResignedPlayer(myPlayer);
         finishGame(
             myPlayer === "sente"
                 ? "gote"
@@ -953,9 +1012,25 @@ export default function OnlineBoard({
                         <span className="turn-status">
                             {isMyTurn ? "あなたの手番です" : "相手の手番です"}
                         </span>
-                    </div>
 
-                    
+                        <span className="status-divider">｜</span>
+
+                        <span className={`connection-status ${connectionStatus}`}>
+                            <span className="connection-dot" />
+
+                            {connectionStatus === "connecting" &&
+                                "接続中..."}
+
+                            {connectionStatus === "waiting-opponent" &&
+                                "相手待ち"}
+
+                            {connectionStatus === "connected" &&
+                                "通信中"}
+
+                            {connectionStatus === "opponent-disconnected" &&
+                                "復帰待ち"}
+                        </span>
+                    </div>
                 )}
 
                 <div className="game-area">
@@ -963,329 +1038,154 @@ export default function OnlineBoard({
                     <div className="game-layout">
 
                         <div className="hand top-hand">
-                            <div className="hand-pieces">
-                                {opponent && Object.entries(displayHands[opponent]).map(([type, count]) =>
-                                    count > 0 ? (
-                                        <div
-                                            key={type}
-                                            className={`hand-piece ${opponent} ${
-                                                selectedHandPiece?.type === type &&
-                                                selectedHandPiece?.player === opponent
-                                                    ? "selected"
-                                                    : ""
-                                            }`}
-                                            onClick={() =>
-                                                handleHandPieceClick(
-                                                    type as CapturedPieceType,
-                                                    opponent
-                                                )
-                                            }
-                                        >
-                                            <div className={`piece ${opponent} ${type.toLowerCase()}`}>
-                                                {pieceNames[type as keyof typeof pieceNames]}
-                                            </div>
-
-                                            {count > 1 && (
-                                                <span className="hand-count">
-                                                    {count}
-                                                </span>
-                                            )}
-                                        </div>
-                                    ) : null
-                                )}
-                            </div>
+                            {opponent && (
+                                <Hand
+                                    player={opponent}
+                                    hands={displayHands}
+                                    selectedHandPiece={selectedHandPiece}
+                                    onPieceClick={handleHandPieceClick}
+                                />
+                            )}
                         </div>
                     
 
                         {/* 盤面 */}
                         <div className="board-container">
 
-                            {/* 手番選択表示 */}
-                            {myPlayer === null && (
-                                !opponentJoined ? (
-                                    <p className="waiting-message">
-                                        相手の入室を待っています
-                                    </p>
-                                ) : isFirstPlayer ? (
+                            {/* ダイアログ */}
+                            <div className="game-dialog">
+                                {winner !== null && !replayMode ? (
                                     <div className="player-select">
                                         <div className="player-select-title">
-                                            自分の手番を選択してください
+                                            {resignedPlayer !== null && (
+                                                <div>
+                                                    {resignedPlayer === myPlayer
+                                                        ? "投了しました"
+                                                        : "投了されました"}
+                                                </div>
+                                            )}
+
+                                            <div>
+                                                {winner === "sente"
+                                                    ? "先手の勝ち！"
+                                                    : "後手の勝ち！"}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : connectionStatus === "opponent-disconnected" ? (
+                                    <div className="player-select">
+                                        <div className="player-select-title">
+                                            相手との接続が切れました
+                                        </div>
+
+                                        <div className="player-select-title">
+                                            復帰を待っています
+                                        </div>
+                                    </div>
+                                ) : showUndoDialog ? (
+                                    <div className="player-select">
+                                        <div className="player-select-title">
+                                            相手が待ったを求めています
                                         </div>
 
                                         <div className="player-select-buttons">
                                             <button
                                                 className="player-button sente-button"
-                                                onClick={() => selectPlayer("sente")}
+                                                onClick={() => {
+                                                    socketRef.current?.send(
+                                                        JSON.stringify({
+                                                            type: "undo-response",
+                                                            player: undoRequester,
+                                                            accepted: true,
+                                                        })
+                                                    );
+
+                                                    setShowUndoDialog(false);
+                                                    setUndoRequester(null);
+                                                }}
                                             >
-                                                先手
+                                                承認
                                             </button>
 
                                             <button
                                                 className="player-button gote-button"
-                                                onClick={() => selectPlayer("gote")}
+                                                onClick={() => {
+                                                    socketRef.current?.send(
+                                                        JSON.stringify({
+                                                            type: "undo-response",
+                                                            player: undoRequester,
+                                                            accepted: false,
+                                                        })
+                                                    );
+
+                                                    setShowUndoDialog(false);
+                                                    setUndoRequester(null);
+                                                }}
                                             >
-                                                後手
+                                                拒否
                                             </button>
                                         </div>
                                     </div>
-                                ) : (
-                                    <p className="waiting-message">
-                                        相手の選択を待っています
-                                    </p>
-                                )
-                            )}
-
-                            {/* 待った承認表示 */}
-                            {showUndoDialog && (
-                                <div className="player-select">
-                                    <div className="player-select-title">
-                                        相手が待ったを求めています
+                                ) : showUndoWaitingDialog ? (
+                                    <div className="player-select">
+                                        <div className="player-select-title">
+                                            待ったの承認を待っています
+                                        </div>
                                     </div>
-
-                                    <div className="player-select-buttons">
-                                        <button
-                                            className="player-button sente-button"
-                                            onClick={() => {
-                                                socketRef.current?.send(
-                                                    JSON.stringify({
-                                                        type: "undo-response",
-                                                        player: undoRequester,
-                                                        accepted: true,
-                                                    })
-                                                );
-
-                                                setShowUndoDialog(false);
-                                                setUndoRequester(null);
-                                            }}
-                                        >
-                                            承認
-                                        </button>
-
-                                        <button
-                                            className="player-button gote-button"
-                                            onClick={() => {
-                                                socketRef.current?.send(
-                                                    JSON.stringify({
-                                                        type: "undo-response",
-                                                        player: undoRequester,
-                                                        accepted: false,
-                                                    })
-                                                );
-
-                                                setShowUndoDialog(false);
-                                                setUndoRequester(null);
-                                            }}
-                                        >
-                                            拒否
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* 待った承認待ち表示 */}
-                            {showUndoWaitingDialog && (
-                                <div className="player-select">
-                                    <div className="player-select-title">
-                                        待ったの承認を待っています
-                                    </div>
-                                </div>
-                            )}
-
-
-                            <div className="board">
-                                {/* メッセージ */}
-                                {message && (
-                                    <div
-                                        className={`board-message ${
-                                            message.length >= 12
-                                                ? "long"
-                                                : message.length >= 8
-                                                    ? "medium"
-                                                    : ""
-                                        }`}
-                                    >
-                                        {message}
-                                    </div>
-                                )}
-
-                                {displayBoard.flatMap((row, rowIndex) =>
-                                    row.map((piece, colIndex) => {
-                                        const actualRow =
-                                            myPlayer === "gote"
-                                                ? 8 - rowIndex
-                                                : rowIndex;
-
-                                        const actualCol =
-                                            myPlayer === "gote"
-                                                ? 8 - colIndex
-                                                : colIndex;
-
-                                        const isSelected =
-                                            selectedSquare?.row === actualRow &&
-                                            selectedSquare?.col === actualCol;
-
-                                        const isMovable = movableSquares.some(
-                                            (square) =>
-                                                square.row === actualRow &&
-                                                square.col === actualCol
-                                        );
-
-                                        const isDrop = dropSquares.some(
-                                            (square) =>
-                                                square.row === actualRow &&
-                                                square.col === actualCol
-                                        );
-
-                                        // ===== 利きを表示している駒か判定 =====
-                                        const isAttack = attackSquares.some(
-                                            (square) =>
-                                                square.row === actualRow &&
-                                                square.col === actualCol
-                                        );
-
-                                        const isAttackPiece =
-                                            piece !== null &&
-                                            attackPieces.includes(piece.id);
-
-                                        // ===== 自分から見て相手の駒なら180度回転 =====
-                                        const shouldRotatePiece =
-                                            myPlayer === null
-                                                ? piece?.player === "gote"
-                                                : piece?.player !== myPlayer;
-
-                                        return (
-                                            <div
-                                                key={`${rowIndex}-${colIndex}`}
-                                                className={`square ${
-                                                    actualRow < 3 || actualRow >= 6
-                                                        ? "promotion-zone"
-                                                        : ""
-                                                }`}
-                                                onClick={() => {
-                                                    handleSquareClick(
-                                                        actualRow,
-                                                        actualCol
-                                                    );
-                                                }}
-                                            >
-                                                <div
-                                                    className={`square-overlay
-                                                        ${isMovable || isDrop ? "movable" : ""}
-                                                        ${isAttack ? "attack" : ""}
-                                                        ${isSelected ? "selected-square-overlay" : ""}
-                                                    `}
-                                                />
-
-                                                {piece && (
-                                                    <div
-                                                        className={`
-                                                            piece
-                                                            ${piece.player}
-                                                            ${shouldRotatePiece ? "rotate-piece" : "my-piece"}
-                                                            ${isSelected ? "selected" : ""}
-                                                            ${isAttackPiece ? "attack-piece" : ""}
-                                                            ${piece.type.toLowerCase()}
-                                                            ${piece.promoted ? "promoted" : ""}
-                                                        `}
-                                                    >
-                                                        {piece.promoted
-                                                            ? promotedPieceNames[piece.type]
-                                                            : pieceNames[piece.type]}
-                                                    </div>
-                                                )}
+                                ) : myPlayer === null ? (
+                                    !opponentJoined ? (
+                                        <p className="waiting-message">
+                                            相手の入室を待っています
+                                        </p>
+                                    ) : isFirstPlayer ? (
+                                        <div className="player-select">
+                                            <div className="player-select-title">
+                                                自分の手番を選択してください
                                             </div>
-                                        );
-                                    })
-                                )}
 
-                                {!replayMode &&
-                                    previewBoard !== null &&
-                                    previewMove &&
-                                    !showCheckmateDialog && (
-                                    (() => {
-                                        const previewDisplayRow =
-                                            myPlayer === "gote"
-                                                ? 8 - previewMove.to.row
-                                                : previewMove.to.row;
-
-                                        const previewDisplayCol =
-                                            myPlayer === "gote"
-                                                ? 8 - previewMove.to.col
-                                                : previewMove.to.col;
-
-                                        return (
-                                            <div
-                                                className={`preview-message ${
-                                                    previewDisplayCol >= 7
-                                                        ? "preview-left"
-                                                        : "preview-right"
-                                                } ${
-                                                    previewDisplayRow >= 7
-                                                        ? "preview-above"
-                                                        : previewDisplayRow <= 1
-                                                            ? "preview-below"
-                                                            : ""
-                                                }`}
-                                                style={{
-                                                    left: `${((previewDisplayCol + 0.5) / 9) * 100}%`,
-                                                    top: `${((previewDisplayRow + 0.5) / 9) * 100}%`,
-                                                }}
-                                            >
-                                                {canPromotePreview && (
-                                                    <>
-                                                        <button
-                                                            disabled={showUndoDialog}
-                                                            onClick={() => {
-                                                                confirmPreview(true);
-                                                            }}
-                                                        >
-                                                            成る
-                                                        </button>
-
-                                                        <button
-                                                            disabled={showUndoDialog}
-                                                            onClick={() => {
-                                                                confirmPreview(false);
-                                                            }}
-                                                        >
-                                                            成らない
-                                                        </button>
-                                                    </>
-                                                )}
-
-                                                {!canPromotePreview && (
-                                                    <button
-                                                        disabled={showUndoDialog}
-                                                        onClick={() => {
-                                                            confirmPreview(false);
-                                                        }}
-                                                    >
-                                                        確定
-                                                    </button>
-                                                )}
+                                            <div className="player-select-buttons">
+                                                <button
+                                                    className="player-button sente-button"
+                                                    onClick={() => selectPlayer("sente")}
+                                                >
+                                                    先手
+                                                </button>
 
                                                 <button
-                                                    disabled={showUndoDialog}
-                                                    onClick={cancelPreview}
+                                                    className="player-button gote-button"
+                                                    onClick={() => selectPlayer("gote")}
                                                 >
-                                                    キャンセル
+                                                    後手
                                                 </button>
                                             </div>
-                                        );
-                                    })()
-                                )}
-
+                                        </div>
+                                    ) : (
+                                        <p className="waiting-message">
+                                            相手の選択を待っています
+                                        </p>
+                                    )
+                                ) : null}
                             </div>
 
-                            {showWinAnimation && winner && !replayMode && (
-                                <div className="win-overlay">
-                                    <div className="win-message">
-                                        {winner === "sente"
-                                            ? "先手の勝ち！"
-                                            : "後手の勝ち！"}
-                                    </div>
-                                </div>
-                            )}
+
+                            <ShogiBoard
+                                message={message}
+                                displayBoard={displayBoard}
+                                myPlayer={myPlayer}
+                                selectedSquare={selectedSquare}
+                                movableSquares={movableSquares}
+                                dropSquares={dropSquares}
+                                attackSquares={attackSquares}
+                                attackPieces={attackPieces}
+                                replayMode={replayMode}
+                                previewMove={previewMove}
+                                canPromotePreview={canPromotePreview}
+                                showCheckmateDialog={showCheckmateDialog}
+                                showUndoDialog={showUndoDialog}
+                                handleSquareClick={handleSquareClick}
+                                confirmPreview={confirmPreview}
+                                cancelPreview={cancelPreview}
+                            />
 
                             {showCheckmateDialog && (
                                 <div className="checkmate-overlay">
@@ -1312,7 +1212,6 @@ export default function OnlineBoard({
                                                         previewMove.capturedPieceType
                                                     );
 
-                                                    finishGame(checkmatePlayer);
                                                     setShowCheckmateDialog(false);
                                                     setCheckmatePlayer(null);
                                                 }}
@@ -1339,37 +1238,14 @@ export default function OnlineBoard({
                         </div>
 
                         <div className="hand bottom-hand">
-                            <div className="hand-pieces">
-                                {myPlayer && Object.entries(displayHands[myPlayer]).map(([type, count]) =>
-                                    count > 0 ? (
-                                        <div
-                                            key={type}
-                                            className={`hand-piece ${myPlayer} ${
-                                                selectedHandPiece?.type === type &&
-                                                selectedHandPiece?.player === myPlayer
-                                                    ? "selected"
-                                                    : ""
-                                            }`}
-                                            onClick={() =>
-                                                handleHandPieceClick(
-                                                    type as CapturedPieceType,
-                                                    myPlayer
-                                                )
-                                            }
-                                        >
-                                            <div className={`piece ${opponent} ${type.toLowerCase()}`}>
-                                                {pieceNames[type as keyof typeof pieceNames]}
-                                            </div>
-
-                                            {count > 1 && (
-                                                <span className="hand-count">
-                                                    {count}
-                                                </span>
-                                            )}
-                                        </div>
-                                    ) : null
-                                )}
-                            </div>
+                            {myPlayer && (
+                                <Hand
+                                    player={myPlayer}
+                                    hands={displayHands}
+                                    selectedHandPiece={selectedHandPiece}
+                                    onPieceClick={handleHandPieceClick}
+                                />
+                            )}
                         </div>
                     
                     </div>
@@ -1457,18 +1333,21 @@ export default function OnlineBoard({
                                 <button 
                                     className="resign-button" 
                                     onClick={resign}
-                                    disabled={showUndoDialog}
+                                    disabled={
+                                        isDialogOpen ||
+                                        winner !== null
+                                    }
                                 >
                                     投了
                                 </button>
 
                                 <button
                                     disabled={
+                                        isDialogOpen ||
                                         winner !== null ||
-                                        myPlayer === turn ||
+                                        isMyTurn ||
                                         undoRequestPending ||
-                                        undoUsedThisTurn ||
-                                        showUndoDialog
+                                        undoUsedThisTurn
                                     }
                                     onClick={() => {
                                         setUndoRequestPending(true);

@@ -1,12 +1,19 @@
 import type { Board, PieceType, Hands } from "@/types/shogi";
 import { createPiece } from "@/lib/piece";
 
+// ============================================================================
+// 初期盤面
+// ============================================================================
+
+// 先手の駒を生成
 const sente = (type: PieceType) =>
     createPiece(type, "sente");
 
+// 後手の駒を生成
 const gote = (type: PieceType) =>
     createPiece(type, "gote");
 
+// 初期盤面
 export const initialBoard: Board = [
     [
         gote("KY"),
@@ -79,6 +86,12 @@ export const initialBoard: Board = [
     ],
 ];
 
+
+// ============================================================================
+// 初期持ち駒
+// ============================================================================
+
+// 初期持ち駒
 export const initialHands: Hands = {
     sente: {
         FU: 0,
@@ -99,3 +112,10 @@ export const initialHands: Hands = {
         HI: 0,
     },
 };
+
+
+
+
+
+
+

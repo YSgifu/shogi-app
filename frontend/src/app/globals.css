@@ -921,7 +921,7 @@ a {
     z-index: 100;
     pointer-events: none;
 
-    white-space: normal;
+    white-space: pre-line;
     text-align: center;
     width: 90%;
 }
@@ -1261,43 +1261,6 @@ a {
     letter-spacing: 0.04em;
 }
 
-.game-status {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-
-    margin: 0 auto 0px;
-    padding: 8px 20px;
-
-    color: var(--theme-text);
-
-    background: rgba(250, 247, 239, 0.82);
-
-    border: 1px solid var(--grid-line);
-    border-radius: 10px;
-
-    box-shadow:
-        0 3px 8px rgba(60, 35, 15, 0.08),
-        inset 0 1px 1px rgba(255, 255, 255, 0.8);
-
-    backdrop-filter: blur(6px);
-
-    font-size: 15px;
-    letter-spacing: 0.03em;
-
-    white-space: nowrap;
-}
-
-.game-status .status-divider {
-    opacity: 0.4;
-}
-
-.game-status .turn-status {
-    font-size: 16px;
-    font-weight: 600;
-}
-
 .player-select {
     position: absolute;
 
@@ -1417,6 +1380,77 @@ a {
 }
 
 /* =========================================================
+    ゲーム状態・接続状態
+   ========================================================= */
+
+/* ゲーム状態 */
+.game-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+
+    margin: 0 auto;
+    padding: 8px 20px;
+
+    color: var(--theme-text);
+
+    background: rgba(250, 247, 239, 0.82);
+
+    border: 1px solid var(--grid-line);
+    border-radius: 10px;
+
+    box-shadow:
+        0 3px 8px rgba(60, 35, 15, 0.08),
+        inset 0 1px 1px rgba(255, 255, 255, 0.8);
+
+    backdrop-filter: blur(6px);
+
+    font-size: 15px;
+    letter-spacing: 0.03em;
+
+    white-space: nowrap;
+}
+
+.game-status .status-divider {
+    opacity: 0.4;
+}
+
+.game-status .turn-status {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.connection-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.connection-dot {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.connection-status.connecting,
+.connection-status.waiting-opponent {
+    color: #d97706;
+}
+
+.connection-status.connected {
+    color: #3f8f4f;
+}
+
+.connection-status.opponent-disconnected {
+    color: #c94a4a;
+}
+
+
+
+/* =========================================================
     Animations
 ========================================================= */
 
@@ -1469,14 +1503,6 @@ a {
     }
 }
 
-.online-button {
-    padding: 10px 20px;
-    border-radius: 8px;
-    border: 1px solid var(--grid-line);
-    background: white;
-    color: var(--foreground);
-    cursor: pointer;
-}
 
 /* ==========================================================================================
     Mobile
@@ -1670,5 +1696,21 @@ a {
 
     .piece {
         touch-action: manipulation;
+    }
+
+    /* ======================= */
+    .game-status {
+        flex-wrap: wrap;
+        padding: 7px 12px;
+        font-size: 13px;
+    }
+
+    .game-status .turn-status {
+        font-size: 14px;
+    }
+
+    .connection-status {
+        width: 100%;
+        justify-content: center;
     }
 }

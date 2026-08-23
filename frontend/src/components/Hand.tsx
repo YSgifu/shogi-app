@@ -38,12 +38,14 @@ export default function Hand({
                                     ? "selected"
                                     : ""
                             }`}
-                            onClick={() =>
+                            onClick={(e) => {
+                                e.stopPropagation();
+
                                 onPieceClick(
                                     type as CapturedPieceType,
                                     player
-                                )
-                            }
+                                );
+                            }}
                         >
                             <div
                                 className={`piece ${player} ${type.toLowerCase()}`}

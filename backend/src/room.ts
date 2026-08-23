@@ -151,9 +151,9 @@ export class Room {
                 // ===== 手番選択したプレイヤー =====
                 const chooserPlayer = this.playerChooser;
 
-                // ===== 相手の手番 =====
+                // ===== 相手の現在のプレイヤー =====
                 const opponentPlayer: Player =
-                    this.selectedPlayer === "sente"
+                    chooserPlayer === "sente"
                         ? "gote"
                         : "sente";
 
@@ -171,19 +171,21 @@ export class Room {
                     this.players[opponentPlayer] = chooserSocket;
                 }
 
-
                 // ===== 先後を両者へ通知 =====
-                this.players[selectedPlayer]?.send(
+                chooserSocket.send(
                     JSON.stringify({
                         type: "player-assigned",
                         player: selectedPlayer,
                     })
                 );
 
-                this.players[opponentPlayer]?.send(
+                opponentSocket.send(
                     JSON.stringify({
                         type: "player-assigned",
-                        player: opponentPlayer,
+                        player:
+                            selectedPlayer === "sente"
+                                ? "gote"
+                                : "sente",
                     })
                 );
 
@@ -417,6 +419,11 @@ export class Room {
             )?.[0];
 
             if (!player) return;
+
+            // ===== 現在登録されているSocketか確認 =====
+            if (this.players[player] !== server) {
+                return;
+            }
 
             // ===== プレイヤーのSocketを解放 =====
             this.players[player] = null;

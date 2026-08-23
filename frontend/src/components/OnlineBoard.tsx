@@ -81,6 +81,8 @@ export default function OnlineBoard({
         | "connected"
         | "opponent-disconnected"
     >("connecting");
+    const [showResignDialog, setShowResignDialog] = useState(false);
+    const [showUndoConfirmDialog, setShowUndoConfirmDialog] = useState(false);
 
     // ==================================================================================================
     // 対戦相手・待った関連
@@ -128,7 +130,9 @@ export default function OnlineBoard({
         connectionStatus !== "connected" ||
         myPlayer === null ||
         showUndoDialog ||
-        showUndoWaitingDialog;
+        showUndoWaitingDialog ||
+        showResignDialog ||
+        showUndoConfirmDialog;
 
     const [resignedPlayer, setResignedPlayer] = useState<Player | null>(null);
 
@@ -263,9 +267,10 @@ export default function OnlineBoard({
 
     // WebSocket接続・サーバーからのメッセージ受信
     useEffect(() => {
-        // const wsUrl = "wss://backend.asahi-dev.workers.dev";
+        const wsUrl = "wss://backend.asahi-dev.workers.dev";
 
-        const wsUrl = "ws://127.0.0.1:8787"
+        // const wsUrl = "ws://127.0.0.1:8787"
+
 
         const socket = new WebSocket(
             `${wsUrl}/api/rooms/${roomId}/ws`
@@ -1037,7 +1042,14 @@ export default function OnlineBoard({
 
                     <div className="game-layout">
 
-                        <div className="hand top-hand">
+                        <div 
+                            className="hand top-hand"
+                            onClick={() => {
+                                setSelectedHandPiece(null);
+                                setSelectedSquare(null);
+                                setMovableSquares([]);
+                            }}
+                        >
                             {opponent && (
                                 <Hand
                                     player={opponent}
@@ -1054,7 +1066,70 @@ export default function OnlineBoard({
 
                             {/* ダイアログ */}
                             <div className="game-dialog">
-                                {winner !== null && !replayMode ? (
+                                {showResignDialog ? (
+                                    <div className="player-select">
+                                        <div className="player-select-title">
+                                            投了しますか？
+                                        </div>
+
+                                        <div className="player-select-buttons">
+                                            <button
+                                                className="player-button sente-button"
+                                                onClick={() => {
+                                                    setShowResignDialog(false);
+                                                    resign();
+                                                }}
+                                            >
+                                                投了する
+                                            </button>
+
+                                            <button
+                                                className="player-button gote-button"
+                                                onClick={() => {
+                                                    setShowResignDialog(false);
+                                                }}
+                                            >
+                                                キャンセル
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : showUndoConfirmDialog ? (
+                                    <div className="player-select">
+                                        <div className="player-select-title">
+                                            待ったを要求しますか？
+                                        </div>
+
+                                        <div className="player-select-buttons">
+                                            <button
+                                                className="player-button sente-button"
+                                                onClick={() => {
+                                                    setShowUndoConfirmDialog(false);
+
+                                                    setUndoRequestPending(true);
+                                                    setUndoUsedThisTurn(true);
+                                                    setShowUndoWaitingDialog(true);
+
+                                                    socketRef.current?.send(
+                                                        JSON.stringify({
+                                                            type: "undo-request",
+                                                        })
+                                                    );
+                                                }}
+                                            >
+                                                要求する
+                                            </button>
+
+                                            <button
+                                                className="player-button gote-button"
+                                                onClick={() => {
+                                                    setShowUndoConfirmDialog(false);
+                                                }}
+                                            >
+                                                キャンセル
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : winner !== null && !replayMode ? (
                                     <div className="player-select">
                                         <div className="player-select-title">
                                             {resignedPlayer !== null && (
@@ -1237,7 +1312,14 @@ export default function OnlineBoard({
 
                         </div>
 
-                        <div className="hand bottom-hand">
+                        <div className=
+                            "hand bottom-hand"
+                            onClick={() => {
+                                setSelectedHandPiece(null);
+                                setSelectedSquare(null);
+                                setMovableSquares([]);
+                            }}
+                        >
                             {myPlayer && (
                                 <Hand
                                     player={myPlayer}
@@ -1332,7 +1414,7 @@ export default function OnlineBoard({
                             <div className="game-controls">
                                 <button 
                                     className="resign-button" 
-                                    onClick={resign}
+                                    onClick={() => setShowResignDialog(true)}
                                     disabled={
                                         isDialogOpen ||
                                         winner !== null
@@ -1350,15 +1432,7 @@ export default function OnlineBoard({
                                         undoUsedThisTurn
                                     }
                                     onClick={() => {
-                                        setUndoRequestPending(true);
-                                        setUndoUsedThisTurn(true);
-                                        setShowUndoWaitingDialog(true);
-
-                                        socketRef.current?.send(
-                                            JSON.stringify({
-                                                type: "undo-request",
-                                            })
-                                        );
+                                        setShowUndoConfirmDialog(true);
                                     }}
                                 >
                                     待った

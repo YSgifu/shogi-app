@@ -25,7 +25,11 @@ export default function Home() {
     }
 
     function joinRoom() {
-        if (!roomId) return;
+        const trimmedRoomId = roomId.trim();
+
+        if (trimmedRoomId.length !== 6) {
+            return;
+        }
 
         router.push(`/room/${roomId.toUpperCase()}`);
     }
@@ -91,11 +95,16 @@ export default function Home() {
                         <input
                             className={styles.input}
                             value={roomId}
-                            onChange={(e) =>
-                                setRoomId(e.target.value)
-                            }
+                            onChange={(e) => {
+                                const value = e.target.value
+                                    .replace(/\D/g, "")
+                                    .slice(0, 6);
+
+                                setRoomId(value);
+                            }}
                             placeholder="ルームIDを入力"
                             maxLength={6}
+                            inputMode="numeric"
                             onKeyDown={(e) => {
                                 if (e.key === "Enter") {
                                     joinRoom();
@@ -106,7 +115,7 @@ export default function Home() {
                         <button
                             className={styles.joinButton}
                             onClick={joinRoom}
-                            disabled={!roomId}
+                            disabled={roomId.length !== 6}
                         >
                             入室
                         </button>

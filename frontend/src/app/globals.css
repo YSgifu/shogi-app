@@ -2,7 +2,7 @@
     --background: #f3eee5;
     --foreground: #2f251c;
 
-    --board: rgba(205, 157, 91, 0.72);
+    --board: rgba(220, 196, 155, 0.72);
     --promotion-zone: rgba(210, 175, 125, 0.2);
     --grid-line: rgba(91, 58, 31, 0.55);
 
@@ -10,6 +10,7 @@
 
     --move: rgba(82, 126, 160, 0.55);
     --attack: rgba(169, 91, 91, 0.55);
+    --last-move: #f5d76e;
 }
 
 /* =========================================================
@@ -102,22 +103,6 @@ a {
     Theme / Current Player
 ========================================================= */
 
-/* .sente-theme {
-    --theme-bg: #f0f7ff;
-    --theme-accent: #5291cd;
-    --theme-text: #1f4f7a;
-
-    background-color: var(--theme-bg);
-}
-
-.gote-theme {
-    --theme-bg: #fff5f5;
-    --theme-accent: #cd6969;
-    --theme-text: #8a3f3f;
-
-    background-color: var(--theme-bg);
-} */
-
 .current-player {
     grid-area: current-player;
     padding: 10px 30px;
@@ -167,13 +152,6 @@ a {
 
     position: relative;
 
-    background:
-        linear-gradient(
-            rgba(210, 165, 105, 0.35),
-            rgba(210, 165, 105, 0.35)
-        ),
-        url("/textures/okoume_veneer_diff_4k.jpg");
-
     background-size: cover;
     background-position: center;
 
@@ -185,21 +163,25 @@ a {
     user-select: none;
 }
 
+.board-default {
+    background-image: url("/textures/okoume_veneer_diff_4k.jpg");
+}
+
+.board-ink {
+    background-image: url("/textures/bamboo-forest-sparrow-ink3.jpg");
+}
+
 .square {
     display: flex;
     align-items: center;
     justify-content: center;
 
     border: 1px solid var(--grid-line);
-    background-color: rgba(216, 210, 199, 0.15);
+    background-color: transparent;
 
     position: relative;
     cursor: pointer;
 }
-
-/* .square.promotion-zone {
-    background-color: var(--promotion-zone);
-} */
 
 /* =========================================================
     Board Overlays / Highlights
@@ -234,12 +216,55 @@ a {
     );
 }
 
+/* 相手の直前の着手 */
 .square-overlay.last-move {
-    background-color: rgba(255, 193, 7, 0.45);
+    background-color: color-mix(
+        in srgb,
+        var(--last-move) 50%,
+        transparent
+    );
 }
 
+/* 直前の着手 + 利き表示 */
+.square-overlay.movable.attack {
+    background-color: var(--move);
+
+    background-image: repeating-linear-gradient(
+        135deg,
+        transparent 0,
+        transparent 8px,
+        var(--attack) 8px,
+        var(--attack) 11px
+    );
+}
+
+/* movable を優先 */
 .square-overlay.last-move.movable {
     background-color: var(--move);
+}
+
+.square-overlay.last-move.attack {
+    background-color: var(--attack);
+
+    background-image: repeating-linear-gradient(
+        135deg,
+        transparent 0,
+        transparent 8px,
+        var(--last-move) 8px,
+        var(--last-move) 11px
+    );
+}
+
+.square-overlay.last-move.movable.attack {
+    background-color: var(--move);
+
+    background-image: repeating-linear-gradient(
+        135deg,
+        transparent 0,
+        transparent 8px,
+        var(--attack) 8px,
+        var(--attack) 11px
+    );
 }
 
 /* =========================================================
@@ -292,11 +317,11 @@ a {
     background: #38291d;
 
     clip-path: polygon(
-        50% 0%,
-        100% 20%,
-        90% 100%,
-        10% 100%,
-        0% 20%
+        50% 2%,
+        88% 20%,
+        98% 100%,
+        2% 100%,
+        12% 20%
     );
 }
 
@@ -308,14 +333,29 @@ a {
 
     inset: 4px;
 
-    background: #e7c98f;
+    background-color: #e7c98f;
+
+    background-image:
+        linear-gradient(
+            105deg,
+            rgba(255, 245, 210, 0.28),
+            rgba(190, 140, 70, 0.08) 45%,
+            rgba(120, 75, 35, 0.18)
+        ),
+        repeating-linear-gradient(
+            88deg,
+            transparent 0,
+            transparent 7px,
+            rgba(120, 75, 35, 0.045) 7px,
+            rgba(120, 75, 35, 0.045) 8px
+        );
 
     clip-path: polygon(
-        50% 0%,
-        98% 20%,
-        88% 100%,
-        12% 100%,
-        2% 20%
+        50% 2%,
+        86% 20%,
+        96% 100%,
+        4% 100%,
+        14% 20%
     );
 }
 
@@ -1441,6 +1481,96 @@ a {
 }
 
 
+.settings-dialog {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+
+    padding: 24px 32px;
+
+    background: #faf7ef;
+
+    border: 3px solid #8b6b4a;
+    border-radius: 14px;
+
+    box-shadow:
+        0 8px 24px rgba(60, 35, 15, 0.28),
+        inset 0 1px 1px rgba(255, 255, 255, 0.9);
+
+    backdrop-filter: blur(6px);
+}
+
+.settings-dialog h2 {
+    margin: 0;
+
+    color: #4a3423;
+
+    font-family: "Yuji Boku", serif;
+    font-size: 24px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+
+    white-space: nowrap;
+}
+
+.settings-overlay {
+    position: fixed;
+    inset: 0;
+
+    z-index: 100;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: rgba(30, 20, 10, 0.25);
+}
+
+.settings-dialog button {
+    padding: 8px 24px;
+
+    color: #4a3423;
+
+    font-family: "Yuji Boku", serif;
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+
+    background: #f3e7cf;
+
+    border: 2px solid #8b6b4a;
+    border-radius: 8px;
+
+    box-shadow:
+        0 3px 0 #6f5136,
+        0 5px 8px rgba(60, 35, 15, 0.18);
+
+    cursor: pointer;
+
+    transition:
+        transform 0.12s ease,
+        box-shadow 0.12s ease,
+        background-color 0.12s ease;
+}
+
+.settings-dialog button:hover {
+    background: #f7ecd8;
+
+    transform: translateY(-1px);
+
+    box-shadow:
+        0 4px 0 #6f5136,
+        0 6px 10px rgba(60, 35, 15, 0.2);
+}
+
+.settings-dialog button:active {
+    transform: translateY(2px);
+
+    box-shadow:
+        0 1px 0 #6f5136,
+        0 2px 5px rgba(60, 35, 15, 0.16);
+}
 
 /* =========================================================
     Animations
@@ -1691,6 +1821,29 @@ a {
 
     .piece {
         touch-action: manipulation;
+    }
+
+    .piece.fu {
+        font-size: clamp(20px, 5vw, 36px);
+    }
+
+    .piece.ky,
+    .piece.ke,
+    .piece.gi {
+        font-size: clamp(22px, 5.3vw, 39px);
+    }
+
+    .piece.ki {
+        font-size: clamp(23px, 5.5vw, 40px);
+    }
+
+    .piece.ka,
+    .piece.hi {
+        font-size: clamp(25px, 5.7vw, 43px);
+    }
+
+    .piece.ou {
+        font-size: clamp(26px, 5.9vw, 45px);
     }
 
     /* ======================= */

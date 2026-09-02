@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Board, Hands, Player, CapturedPieceType, PieceType, Move } from "@/types/shogi";
+import type { Board, Hands, Player, CapturedPieceType, PieceType, Move, Settings } from "@/types/shogi";
 import { getMovableSquares, canPromote, canDropPiece, getAttackSquares, applyMove, rebuildGameState } from "@/lib/moves";
 import { isInCheck, isLegalMove, isCheckmate } from "@/lib/check";
 import Hand from "@/components/Hand";
@@ -22,6 +22,12 @@ export default function OnlineBoard({
     // ==================================================================================================
 
     const socketRef = useRef<WebSocket | null>(null);
+
+    // デフォルト設定
+    const defaultSettings: Settings = {
+        boardBackground: "default",
+        muteSound: false,
+    };
 
     // ==================================================================================================
     // 対局の基本状態
@@ -114,6 +120,16 @@ export default function OnlineBoard({
     const [replayMoves, setReplayMoves] = useState<Move[]>([]);
 
     // ==================================================================================================
+    // 設定関連
+    // ==================================================================================================
+
+    const [settings, setSettings] =
+        useState<Settings>(defaultSettings);
+
+    const [showSettings, setShowSettings] =
+        useState(false);
+
+    // ==================================================================================================
     // 同期用Ref
     // ==================================================================================================
 
@@ -121,6 +137,7 @@ export default function OnlineBoard({
     const handsRef = useRef<Hands>(hands);
     const myPlayerRef = useRef<Player | null>(myPlayer);
     const moveSoundRef = useRef<HTMLAudioElement | null>(null);
+    const settingsRef = useRef<Settings>(settings);
 
     // ==================================================================================================
     // 追加分
@@ -135,6 +152,12 @@ export default function OnlineBoard({
         showUndoConfirmDialog;
 
     const [resignedPlayer, setResignedPlayer] = useState<Player | null>(null);
+    const [moves, setMoves] = useState<Move[]>([]);
+    const lastMove = moves.length > 0
+        ? moves[moves.length - 1]
+        : null;
+
+
 
     // ==================================================================================================
     // 表示用の派生データ
@@ -258,6 +281,10 @@ export default function OnlineBoard({
             new Audio("/sounds/japanese-chess-piece1.mp3");
     }, []);
 
+    useEffect(() => {
+        settingsRef.current = settings;
+    }, [settings]);
+
 
     // ===========================================================================================================================
 
@@ -309,6 +336,7 @@ export default function OnlineBoard({
             if (message.type === "game-state") {
                 const result = rebuildGameState(message.moves);
 
+                setMoves(message.moves);
                 setCurrentBoard(result.board);
                 setHands(result.hands);
                 setTurn(message.turn);
@@ -366,9 +394,8 @@ export default function OnlineBoard({
             }
 
             if (message.type === "undo") {
-                const result = rebuildGameState(
-                    message.moves
-                );
+                const result = rebuildGameState(message.moves);
+                setMoves(message.moves);
 
                 // 待った承認後のゲーム状態を復元
                 setMessage("待ったが\n承認されました");
@@ -416,10 +443,13 @@ export default function OnlineBoard({
                     message.move
                 );
 
-                const sound = moveSoundRef.current;
-                if (sound) {
-                    sound.currentTime = 0;
-                    sound.play();
+                if (!settingsRef.current.muteSound) {
+                    const sound = moveSoundRef.current;
+
+                    if (sound) {
+                        sound.currentTime = 0;
+                        sound.play();
+                    }
                 }
 
                 const currentMyPlayer = myPlayerRef.current;
@@ -447,6 +477,7 @@ export default function OnlineBoard({
 
                 setCurrentBoard(result.board);
                 setHands(result.hands);
+                setMoves((prev) => [...prev, message.move]);
 
                 setTurn(message.turn);
             }
@@ -516,12 +547,16 @@ export default function OnlineBoard({
         setHands(result.hands);
 
         // 駒音を再生
-        const sound = moveSoundRef.current;
+        if (!settingsRef.current.muteSound) {
+            const sound = moveSoundRef.current;
 
-        if (sound) {
-            sound.currentTime = 0;
-            sound.play();
+            if (sound) {
+                sound.currentTime = 0;
+                sound.play();
+            }
         }
+
+        setMoves((prev) => [...prev, move]);
 
         // サーバーへMoveを送信
         socketRef.current?.send(JSON.stringify(move));
@@ -1260,6 +1295,8 @@ export default function OnlineBoard({
                                 handleSquareClick={handleSquareClick}
                                 confirmPreview={confirmPreview}
                                 cancelPreview={cancelPreview}
+                                lastMove={lastMove}
+                                settings={settings}
                             />
 
                             {showCheckmateDialog && (
@@ -1450,6 +1487,13 @@ export default function OnlineBoard({
                                 >
                                     棋譜再生
                                 </button>
+
+                                <button
+                                    onClick={() => setShowSettings((prev) => !prev)}
+                                >
+                                    ⚙ 設定
+                                </button>
+
                             </div>
                         )}
 
@@ -1505,6 +1549,70 @@ export default function OnlineBoard({
                     </div>
 
                 </div>
+
+                {/* ここに設定ダイアログ */}
+                {showSettings && (
+                    <div className="settings-overlay">
+                        <div className="settings-dialog">
+                            <h2>設定</h2>
+
+                            <div className="settings-section">
+                                <h3>将棋盤の背景</h3>
+
+                                <label>
+                                    <input
+                                        type="radio"
+                                        name="boardBackground"
+                                        checked={settings.boardBackground === "default"}
+                                        onChange={() =>
+                                        setSettings({
+                                            ...settings,
+                                            boardBackground: "default",
+                                        })
+                                        }
+                                    />
+                                        標準
+                                </label>
+
+                                <label>
+                                    <input
+                                        type="radio"
+                                        name="boardBackground"
+                                        checked={settings.boardBackground === "ink"}
+                                        onChange={() =>
+                                        setSettings({
+                                            ...settings,
+                                            boardBackground: "ink",
+                                        })
+                                        }
+                                    />
+                                        水墨画
+                                </label>
+                            </div>
+                            <div className="settings-section">
+                                <h3>サウンド</h3>
+
+                                <label>
+                                    <input
+                                    type="checkbox"
+                                    checked={settings.muteSound}
+                                    onChange={(e) =>
+                                        setSettings((prev) => ({
+                                            ...prev,
+                                            muteSound: e.target.checked,
+                                        }))
+                                    }
+                                    />
+                                    打鍵音をミュート
+                                </label>
+                            </div>
+
+                            <button onClick={() => setShowSettings(false)}>
+                                閉じる
+                            </button>
+                        </div>
+                    </div>
+                )}
 
             </div>
 

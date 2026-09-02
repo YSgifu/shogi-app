@@ -2,6 +2,7 @@ import type {
     Board as BoardType,
     Move,
     Player,
+    Settings,
 } from "@/types/shogi";
 import type { Square } from "@/lib/moves";
 import { pieceNames, promotedPieceNames } from "@/lib/piece";
@@ -27,6 +28,8 @@ type BoardProps = {
     handleSquareClick: (rowIndex: number, colIndex: number) => void;
     confirmPreview: (promote: boolean) => void;
     cancelPreview: () => void;
+    lastMove: Move | null;
+    settings: Settings;
 };
 
 export default function ShogiBoard({
@@ -46,9 +49,11 @@ export default function ShogiBoard({
     handleSquareClick,
     confirmPreview,
     cancelPreview,
+    lastMove,
+    settings,
 }: BoardProps) {
     return (
-        <div className="board">
+        <div className={`board board-${settings.boardBackground}`}>
             {/* メッセージ */}
             {message && (
                 <div
@@ -108,6 +113,20 @@ export default function ShogiBoard({
                             ? piece?.player === "gote"
                             : piece?.player !== myPlayer;
 
+                    const isLastMove =
+                        lastMove !== null &&
+                        (
+                            (
+                                lastMove.from !== null &&
+                                lastMove.from.row === actualRow &&
+                                lastMove.from.col === actualCol
+                            ) ||
+                            (
+                                lastMove.to.row === actualRow &&
+                                lastMove.to.col === actualCol
+                            )
+                        );
+
                     return (
                         <div
                             key={`${rowIndex}-${colIndex}`}
@@ -134,6 +153,11 @@ export default function ShogiBoard({
                                     ${
                                         isSelected
                                             ? "selected-square-overlay"
+                                            : ""
+                                    }
+                                    ${
+                                        isLastMove
+                                            ? "last-move"
                                             : ""
                                     }
                                 `}

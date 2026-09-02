@@ -78,6 +78,12 @@ export type Move = {
     capturedPieceType?: CapturedPieceType;
 };
 
+export type Settings = {
+    boardBackground: "default" | "ink";
+    muteSound: boolean;
+};
+
+
 
 
 

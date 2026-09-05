@@ -6,6 +6,7 @@ import { getMovableSquares, canPromote, canDropPiece, getAttackSquares, applyMov
 import { isInCheck, isLegalMove, isCheckmate } from "@/lib/check";
 import Hand from "@/components/Hand";
 import ShogiBoard from "@/components/Board";
+import { credits } from "@/data/credits";
 
 
 export default function OnlineBoard({
@@ -86,6 +87,7 @@ export default function OnlineBoard({
         | "waiting-opponent"
         | "connected"
         | "opponent-disconnected"
+        | "connection-error"
     >("connecting");
     const [showResignDialog, setShowResignDialog] = useState(false);
     const [showUndoConfirmDialog, setShowUndoConfirmDialog] = useState(false);
@@ -136,8 +138,8 @@ export default function OnlineBoard({
     const boardRef = useRef<Board>(currentBoard);
     const handsRef = useRef<Hands>(hands);
     const myPlayerRef = useRef<Player | null>(myPlayer);
-    const moveSoundRef = useRef<HTMLAudioElement | null>(null);
     const settingsRef = useRef<Settings>(settings);
+    const soundsRef = useRef<Record<string, HTMLAudioElement>>({});
 
     // ==================================================================================================
     // 追加分
@@ -156,6 +158,10 @@ export default function OnlineBoard({
     const lastMove = moves.length > 0
         ? moves[moves.length - 1]
         : null;
+
+    const [showCredits, setShowCredits] = useState(false);
+    const [showConnectionErrorDialog, setShowConnectionErrorDialog] =
+        useState(false);
 
 
 
@@ -275,15 +281,26 @@ export default function OnlineBoard({
         myPlayerRef.current = myPlayer;
     }, [myPlayer]);
 
-    // 駒音を初期化
-    useEffect(() => {
-        moveSoundRef.current =
-            new Audio("/sounds/japanese-chess-piece1.mp3");
-    }, []);
-
     useEffect(() => {
         settingsRef.current = settings;
     }, [settings]);
+
+    useEffect(() => {
+        soundsRef.current = {
+            move: new Audio("/sounds/japanese-chess-piece1.mp3"),
+            gameStart: new Audio("/sounds/game-start.wav"),
+            check: new Audio("/sounds/check.wav"),
+        };
+    }, []);
+
+    const playSound = (name: keyof typeof soundsRef.current) => {
+        if (settingsRef.current.muteSound) return;
+
+        const sound = soundsRef.current[name];
+
+        sound.currentTime = 0;
+        sound.play();
+    };
 
 
     // ===========================================================================================================================
@@ -330,6 +347,11 @@ export default function OnlineBoard({
 
             if (message.type === "player-assigned") {
                 setMyPlayer(message.player);
+
+                setMessage("対局開始！");
+
+                playSound("gameStart");
+
                 return;
             }
 
@@ -443,14 +465,7 @@ export default function OnlineBoard({
                     message.move
                 );
 
-                if (!settingsRef.current.muteSound) {
-                    const sound = moveSoundRef.current;
-
-                    if (sound) {
-                        sound.currentTime = 0;
-                        sound.play();
-                    }
-                }
+                playSound("move");
 
                 const currentMyPlayer = myPlayerRef.current;
 
@@ -472,6 +487,7 @@ export default function OnlineBoard({
                     )
                 ) {
                     setMessage("王手！");
+                    playSound("check");
                 }
 
 
@@ -480,6 +496,13 @@ export default function OnlineBoard({
                 setMoves((prev) => [...prev, message.move]);
 
                 setTurn(message.turn);
+            }
+        };
+
+        socket.onclose = (event) => {
+            if (event.code === 1006) {
+                setConnectionStatus("connection-error");
+                setShowConnectionErrorDialog(true);
             }
         };
 
@@ -540,6 +563,7 @@ export default function OnlineBoard({
             isInCheck(result.board, opponent)
         ) {
             setMessage("王手！");
+            playSound("check");
         }
 
         // 盤面・持ち駒を更新
@@ -547,14 +571,7 @@ export default function OnlineBoard({
         setHands(result.hands);
 
         // 駒音を再生
-        if (!settingsRef.current.muteSound) {
-            const sound = moveSoundRef.current;
-
-            if (sound) {
-                sound.currentTime = 0;
-                sound.play();
-            }
-        }
+        playSound("move");
 
         setMoves((prev) => [...prev, move]);
 
@@ -1069,6 +1086,9 @@ export default function OnlineBoard({
 
                             {connectionStatus === "opponent-disconnected" &&
                                 "復帰待ち"}
+
+                            {connectionStatus === "connection-error" &&
+                                "通信エラー"}
                         </span>
                     </div>
                 )}
@@ -1101,7 +1121,17 @@ export default function OnlineBoard({
 
                             {/* ダイアログ */}
                             <div className="game-dialog">
-                                {showResignDialog ? (
+                                {showConnectionErrorDialog ? (
+                                    <div className="player-select">
+                                        <div className="player-select-title">
+                                            通信が切断されました
+                                        </div>
+
+                                        <div className="player-select-title">
+                                            対局を続行できません
+                                        </div>
+                                    </div>
+                                ) : showResignDialog ? (
                                     <div className="player-select">
                                         <div className="player-select-title">
                                             投了しますか？
@@ -1603,11 +1633,41 @@ export default function OnlineBoard({
                                         }))
                                     }
                                     />
-                                    打鍵音をミュート
+                                    ミュート
                                 </label>
                             </div>
 
+                            <button onClick={() => setShowCredits(true)}>
+                                素材・ライセンス
+                            </button>
+
                             <button onClick={() => setShowSettings(false)}>
+                                閉じる
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {showCredits && (
+                    <div className="credits-overlay">
+                        <div className="credits-dialog">
+                            <h2>素材・ライセンス</h2>
+
+                            <p>本アプリでは、以下の素材を使用しています。</p>
+
+                            {credits.map((credit) => (
+                                <div key={credit.name} className="credit-item">
+                                    <a
+                                        href={credit.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        {credit.name}
+                                    </a>
+                                </div>
+                            ))}
+
+                            <button onClick={() => setShowCredits(false)}>
                                 閉じる
                             </button>
                         </div>

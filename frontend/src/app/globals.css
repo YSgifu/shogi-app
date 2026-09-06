@@ -19,6 +19,7 @@
 
 html {
     height: 100%;
+    zoom: 1.1;
 }
 
 html,
@@ -171,6 +172,15 @@ a {
     background-image: url("/textures/bamboo-forest-sparrow-ink3.jpg");
 }
 
+.board-sea {
+    background-image: url("/textures/sea.jpg");
+}
+
+.board-sky {
+    background-image: url("/textures/sky.jpg");
+}
+
+
 .square {
     display: flex;
     align-items: center;
@@ -196,27 +206,38 @@ a {
     pointer-events: none;
 }
 
-.square-overlay.selected-square-overlay {
-    background-color: var(--move);
-}
+/* =========================
+    マスの基本状態
+========================= */
 
+/* 移動可能・駒打ち */
 .square-overlay.movable {
     background-color: var(--move);
 }
 
+/* 駒の利き */
 .square-overlay.attack {
     background-color: var(--attack);
 }
 
+/* 移動可能 + 利き */
 .square-overlay.movable.attack {
-    background-color: color-mix(
-        in srgb,
-        var(--move) 50%,
-        var(--attack) 50%
-    );
+    background-color: var(--move);
 }
 
-/* 相手の直前の着手 */
+.square-overlay.movable.attack::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 16px;
+    height: 16px;
+    background-color: var(--attack);
+    clip-path: polygon(0 0, 100% 0, 0 100%);
+    pointer-events: none;
+}
+
+/* 直前の着手 */
 .square-overlay.last-move {
     background-color: color-mix(
         in srgb,
@@ -225,36 +246,29 @@ a {
     );
 }
 
-/* 直前の着手 + 利き表示 */
-.square-overlay.movable.attack {
-    background-color: var(--move);
-
-    background-image: repeating-linear-gradient(
-        135deg,
-        transparent 0,
-        transparent 8px,
-        var(--attack) 8px,
-        var(--attack) 11px
-    );
-}
-
-/* movable を優先 */
+/* 直前の着手 + 移動可能 */
 .square-overlay.last-move.movable {
     background-color: var(--move);
 }
 
+/* 直前の着手 + 利き */
 .square-overlay.last-move.attack {
     background-color: var(--attack);
-
-    background-image: repeating-linear-gradient(
-        135deg,
-        transparent 0,
-        transparent 8px,
-        var(--last-move) 8px,
-        var(--last-move) 11px
-    );
 }
 
+.square-overlay.last-move.attack::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 10px;
+    height: 10px;
+    background-color: var(--last-move);
+    clip-path: polygon(0 0, 100% 0, 0 100%);
+    pointer-events: none;
+}
+
+/* 直前の着手 + 移動可能 + 利き */
 .square-overlay.last-move.movable.attack {
     background-color: var(--move);
 
@@ -265,6 +279,74 @@ a {
         var(--attack) 8px,
         var(--attack) 11px
     );
+}
+
+
+/* =========================
+    攻撃関係：駒
+========================= */
+
+/* ホバー中の駒 */
+.piece.focused-piece {
+    filter: drop-shadow(0 0 5px rgba(255, 220, 100, 0.9));
+}
+
+/* ホバー中の自分の駒を攻撃している相手駒 */
+.attacking-piece {
+    filter:
+        drop-shadow(0 0 4px rgba(255, 180, 180, 0.9))
+        drop-shadow(0 0 8px rgba(220, 120, 120, 0.6));
+}
+
+
+/* =========================
+    攻撃関係：マス
+========================= */
+
+/* ホバー中の自分の駒が攻撃対象になっているマス */
+.square-overlay.attack-target {
+    background-color: rgba(205, 125, 125, 0.65);
+    box-shadow:
+        inset 0 0 6px rgba(255, 220, 220, 0.6),
+        0 0 4px rgba(220, 140, 140, 0.5);
+}
+
+/* ★ここを追加 */
+.square-overlay.movable.attack-target {
+    background-color: var(--move);
+}
+
+
+
+/* =========================
+    選択状態
+========================= */
+
+/* 選択状態を最優先 */
+.square-overlay.selected-square-overlay {
+    background-color: var(--move);
+}
+
+
+/* =========================
+    攻撃関係：軌道
+========================= */
+
+.attack-target-outline {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.attack-target-outline path {
+    stroke: rgba(130, 65, 65, 0.8);
+    stroke-width: 0.045;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
 }
 
 /* =========================================================
@@ -336,18 +418,22 @@ a {
     background-color: #e7c98f;
 
     background-image:
-        linear-gradient(
-            105deg,
-            rgba(255, 245, 210, 0.28),
-            rgba(190, 140, 70, 0.08) 45%,
-            rgba(120, 75, 35, 0.18)
+        radial-gradient(
+            ellipse at 25% 15%,
+            rgba(255, 250, 225, 0.4),
+            transparent 40%
         ),
-        repeating-linear-gradient(
-            88deg,
-            transparent 0,
-            transparent 7px,
-            rgba(120, 75, 35, 0.045) 7px,
-            rgba(120, 75, 35, 0.045) 8px
+        radial-gradient(
+            ellipse at 80% 80%,
+            rgba(100, 60, 25, 0.14),
+            transparent 50%
+        ),
+        linear-gradient(
+            92deg,
+            rgba(255, 245, 210, 0.18) 0%,
+            rgba(215, 170, 100, 0.06) 35%,
+            rgba(170, 115, 55, 0.08) 70%,
+            rgba(110, 65, 30, 0.14) 100%
         );
 
     clip-path: polygon(
@@ -1656,6 +1742,32 @@ a {
     box-shadow: 0 3px 7px rgba(60, 35, 15, 0.18);
 }
 
+.attacking-piece-arrows {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 6;
+}
+
+.attack-flow-trail {
+    fill: none;
+    stroke-width: 0.045;
+    stroke-linecap: round;
+}
+
+.attack-arrow-head {
+    fill: none;
+    stroke-width: 0.06;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.settings-section label {
+    display: block;
+    margin-bottom: 8px;
+}
 
 /* =========================================================
     Animations

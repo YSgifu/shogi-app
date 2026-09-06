@@ -28,6 +28,9 @@ export default function OnlineBoard({
     const defaultSettings: Settings = {
         boardBackground: "default",
         muteSound: false,
+        showLastMove: true,
+        showOpponentAttack: true,
+        showAttackedByOpponent: true,
     };
 
     // ==================================================================================================
@@ -155,13 +158,22 @@ export default function OnlineBoard({
 
     const [resignedPlayer, setResignedPlayer] = useState<Player | null>(null);
     const [moves, setMoves] = useState<Move[]>([]);
-    const lastMove = moves.length > 0
-        ? moves[moves.length - 1]
-        : null;
+    const lastMove = replayMode
+        ? replayMoveIndex > 0
+            ? replayMoves[replayMoveIndex - 1]
+            : null
+        : moves.length > 0
+            ? moves[moves.length - 1]
+            : null;
 
     const [showCredits, setShowCredits] = useState(false);
     const [showConnectionErrorDialog, setShowConnectionErrorDialog] =
         useState(false);
+    const [focusedPieceSquare, setFocusedPieceSquare] =
+        useState<{ row: number; col: number } | null>(null);
+    
+    const [targetPieceSquare, setTargetPieceSquare] =
+        useState<{ row: number; col: number } | null>(null);
 
 
 
@@ -245,6 +257,44 @@ export default function OnlineBoard({
             position.col
         );
     });
+
+    const focusedAttackSquares =
+        focusedPieceSquare !== null
+            ? getAttackSquares(
+                boardForInteraction,
+                focusedPieceSquare.row,
+                focusedPieceSquare.col
+            )
+            : [];
+
+    const attackingPieceIds = targetPieceSquare
+        ? attackBoard
+            .flatMap((row, rowIndex) =>
+                row.map((piece, colIndex) => ({
+                    piece,
+                    row: rowIndex,
+                    col: colIndex,
+                }))
+            )
+            .filter(
+                ({ piece }) =>
+                    piece &&
+                    myPlayer !== null &&
+                    piece.player !== myPlayer
+            )
+            .filter(({ row, col }) =>
+                getAttackSquares(
+                    attackBoard,
+                    row,
+                    col
+                ).some(
+                    (square) =>
+                        square.row === targetPieceSquare.row &&
+                        square.col === targetPieceSquare.col
+                )
+            )
+            .map(({ piece }) => piece!.id)
+        : [];
 
     // ==================================================================================================
     // 対局終了処理
@@ -764,6 +814,27 @@ export default function OnlineBoard({
 
             return;
         }
+
+        // 相手の駒をタップした場合、その駒の利きを一時表示
+        const piece = boardForInteraction[rowIndex][colIndex];
+
+        if (
+            previewMove === null &&
+            !selectedSquare &&
+            !selectedHandPiece &&
+            piece &&
+            myPlayer !== null &&
+            piece.player !== myPlayer
+        ) {
+            setFocusedPieceSquare({
+                row: rowIndex,
+                col: colIndex,
+            });
+
+            return;
+        }
+
+        setFocusedPieceSquare(null);
 
         // リプレイ中は通常操作しない
         if (replayMode) return;
@@ -1327,6 +1398,12 @@ export default function OnlineBoard({
                                 cancelPreview={cancelPreview}
                                 lastMove={lastMove}
                                 settings={settings}
+                                focusedPieceSquare={focusedPieceSquare}
+                                setFocusedPieceSquare={setFocusedPieceSquare}
+                                focusedAttackSquares={focusedAttackSquares}
+                                attackingPieceIds={attackingPieceIds}
+                                targetPieceSquare={targetPieceSquare}
+                                setTargetPieceSquare={setTargetPieceSquare}
                             />
 
                             {showCheckmateDialog && (
@@ -1404,6 +1481,55 @@ export default function OnlineBoard({
                         <div className="board-controls-title">
                             ゲーム操作
                         </div>
+
+                        {replayMode && (
+                            <div className="game-controls replay-controls">
+                                <button
+                                    onClick={() => {
+                                        setReplayMoveIndex(0);
+                                    }}
+                                >
+                                    最初
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        setReplayMoveIndex((prev) =>
+                                            Math.max(0, prev - 1)
+                                        );
+                                    }}
+                                >
+                                    ←
+                                </button>
+
+                                <span>
+                                    {replayMoveIndex} / {replayMoves.length}
+                                </span>
+
+                                <button
+                                    onClick={() => {
+                                        setReplayMoveIndex((prev) =>
+                                            Math.min(
+                                                replayMoves.length,
+                                                prev + 1
+                                            )
+                                        );
+                                    }}
+                                >
+                                    →
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        setReplayMoveIndex(
+                                            replayMoves.length
+                                        );
+                                    }}
+                                >
+                                    最後
+                                </button>
+                            </div>
+                        )}
 
                         <div className="mode-switch">
                             <div
@@ -1527,54 +1653,6 @@ export default function OnlineBoard({
                             </div>
                         )}
 
-                        {replayMode && (
-                            <div className="game-controls replay-controls">
-                                <button
-                                    onClick={() => {
-                                        setReplayMoveIndex(0);
-                                    }}
-                                >
-                                    最初
-                                </button>
-
-                                <button
-                                    onClick={() => {
-                                        setReplayMoveIndex((prev) =>
-                                            Math.max(0, prev - 1)
-                                        );
-                                    }}
-                                >
-                                    ←
-                                </button>
-
-                                <span>
-                                    {replayMoveIndex} / {replayMoves.length}
-                                </span>
-
-                                <button
-                                    onClick={() => {
-                                        setReplayMoveIndex((prev) =>
-                                            Math.min(
-                                                replayMoves.length,
-                                                prev + 1
-                                            )
-                                        );
-                                    }}
-                                >
-                                    →
-                                </button>
-
-                                <button
-                                    onClick={() => {
-                                        setReplayMoveIndex(
-                                            replayMoves.length
-                                        );
-                                    }}
-                                >
-                                    最後
-                                </button>
-                            </div>
-                        )}
 
                     </div>
 
@@ -1618,6 +1696,37 @@ export default function OnlineBoard({
                                     />
                                         水墨画
                                 </label>
+
+                                <label>
+                                    <input
+                                        type="radio"
+                                        name="boardBackground"
+                                        checked={settings.boardBackground === "sea"}
+                                        onChange={() =>
+                                        setSettings({
+                                            ...settings,
+                                            boardBackground: "sea",
+                                        })
+                                        }
+                                    />
+                                        幻想的な海
+                                </label>
+
+                                <label>
+                                    <input
+                                        type="radio"
+                                        name="boardBackground"
+                                        checked={settings.boardBackground === "sky"}
+                                        onChange={() =>
+                                        setSettings({
+                                            ...settings,
+                                            boardBackground: "sky",
+                                        })
+                                        }
+                                    />
+                                        空
+                                </label>
+
                             </div>
                             <div className="settings-section">
                                 <h3>サウンド</h3>
@@ -1635,6 +1744,53 @@ export default function OnlineBoard({
                                     />
                                     ミュート
                                 </label>
+                            </div>
+
+                            <div className="settings-section">
+                                <h3>盤面表示</h3>
+
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        checked={settings.showLastMove}
+                                        onChange={(e) =>
+                                            setSettings((prev) => ({
+                                                ...prev,
+                                                showLastMove: e.target.checked,
+                                            }))
+                                        }
+                                    />
+                                    直近の移動ハイライト
+                                </label>
+
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        checked={settings.showOpponentAttack}
+                                        onChange={(e) =>
+                                            setSettings((prev) => ({
+                                                ...prev,
+                                                showOpponentAttack: e.target.checked,
+                                            }))
+                                        }
+                                    />
+                                    相手の駒にホバーした時の利き表示
+                                </label>
+
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        checked={settings.showAttackedByOpponent}
+                                        onChange={(e) =>
+                                            setSettings((prev) => ({
+                                                ...prev,
+                                                showAttackedByOpponent: e.target.checked,
+                                            }))
+                                        }
+                                    />
+                                    自分の駒にホバーした時の被攻撃表示
+                                </label>
+
                             </div>
 
                             <button onClick={() => setShowCredits(true)}>

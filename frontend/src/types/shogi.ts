@@ -79,8 +79,11 @@ export type Move = {
 };
 
 export type Settings = {
-    boardBackground: "default" | "ink";
+    boardBackground: "default" | "ink" | "sea" | "sky";
     muteSound: boolean;
+    showLastMove: boolean,
+    showOpponentAttack: boolean,
+    showAttackedByOpponent: boolean,
 };
 
 
